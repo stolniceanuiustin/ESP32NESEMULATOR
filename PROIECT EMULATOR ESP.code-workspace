@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"name": "ESP32NESEMULATOR",
+			"path": "."
+		}
+	],
+	"settings": {}
+}
