@@ -3,3 +3,9 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+.vscode/settings.json
+.vscode/tasks.json
+compile_commands.json
+data/*.bin
+.clangd
+.cache/*

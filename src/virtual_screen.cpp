@@ -1,0 +1,37 @@
+#include "virtual_screen.h"
+
+uint16_t nes_pallete_16[64];
+
+Screen::Screen()
+{
+    for (int i = 0; i < 256 * 240; i++)
+        pixels[i] = 0x0000; 
+    RENDER_ENABLED = false;
+}
+
+void Screen::generate_16bit_pallet()
+{
+    for (int i = 0; i < 64; i++)
+    {
+        uint32_t color = nes_pallete_32[i];
+        uint8_t r = (color >> 24) & 0xFF;
+        uint8_t g = (color >> 16) & 0xFF;
+        uint8_t b = (color >> 8) & 0xFF;
+
+        // Convert 8-bit RGB to 5-6-5 format
+        uint16_t r5 = (r >> 3) & 0x1F;
+        uint16_t g6 = (g >> 2) & 0x3F;
+        uint16_t b5 = (b >> 3) & 0x1F;
+
+        nes_pallete_16[i] = (r5 << 11) | (g6 << 5) | b5;
+    }
+}
+
+void Screen::set_pixel(uint16_t scanline, uint16_t dot, uint8_t color_index)
+{
+    // Bounds check (optional)
+    if (scanline >= 240 || dot >= 256 || color_index >= 64)
+        return;
+
+    pixels[256 * scanline + dot] = nes_pallete_16[color_index];
+}

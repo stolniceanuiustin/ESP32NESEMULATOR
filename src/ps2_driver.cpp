@@ -1,4 +1,5 @@
 #include "ps2_driver.h"
+#include <Arduino.h>
 
 PS2::PS2(int datPin, int cmdPin, int attPin, int clkPin, int delayUS) : PS2_DAT(datPin), PS2_CMD(cmdPin), PS2_ATT(attPin), PS2_CLK(clkPin), PS2_DELAY(delayUS),
                                                                        buttonsLow(0xFF), buttonsHigh(0xFF) {}
