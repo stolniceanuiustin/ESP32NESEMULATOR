@@ -92,24 +92,23 @@ void BUS::reset()
 //     cpu_ram.hexdump("cpu_hexdump", 0x07FF);
 //     ppu_ram.hexdump("ppu_hexdump", 0x3FFF);
 // }
-
 void BUS::clock()
 {
-    //ppu.execute();
+    ppu.execute();
     if (global_clock % 3 == 0)
     {
         if (dma_transfer == true)
         {
             if (dma_first_clock)
             {
-                if (global_clock & 1) // instead of modulo
+                if ((global_clock & 1) == 0) // instead of modulo
                 {
                     dma_first_clock = false;
                 }
             }
             else
             {
-                if (global_clock & 1 == 0) // instead of $2 == 0
+                if (global_clock & 1) // instead of $2 == 0
                 {
                     oam_dma_data = cpu_read(oam_dma_page << 8 | oam_dma_addr);
                 }
@@ -131,51 +130,4 @@ void BUS::clock()
         }
     }
     global_clock++;
-}
-
-// TODO: FIX MODULO
-void BUS::clock(bool debug)
-{
-    if (debug)
-    {
-        ppu.execute();
-        if (global_clock % 3 == 0)
-        {
-            if (dma_transfer == true)
-            {
-                if (dma_first_clock)
-                {
-                    if (global_clock & 1) // instead of modulo
-                    {
-                        dma_first_clock = false;
-                    }
-                }
-                else
-                {
-                    if (global_clock & 1 == 0) // instead of $2 == 0
-                    {
-                        oam_dma_data = cpu_read(oam_dma_page << 8 | oam_dma_addr);
-                    }
-                    else
-                    {
-                        ppu.pOAM[oam_dma_addr] = oam_dma_data;
-                        oam_dma_addr++;
-                        if (oam_dma_addr == 0x00)
-                        {
-                            dma_transfer = false;
-                            dma_first_clock = true;
-                        }
-                    }
-                }
-            }
-            else
-            {
-                cpu.clock(debug);
-            }
-        }
-        global_clock++;
-    }
-    else
-    {
-    }
 }

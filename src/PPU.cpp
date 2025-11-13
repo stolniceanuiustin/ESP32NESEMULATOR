@@ -6,6 +6,8 @@
 
 
 //TODO: Remove all lambdas from this!
+
+
 void clear_status_register(byte &x)
 {
     x &= 0b00011111;
@@ -31,6 +33,7 @@ void PPU::reset()
         pallete_table[i] = 0;
 }
 
+//Called very much so inline needed
 byte PPU::ppu_read(uint16_t addr, bool read_only)
 {
     addr &= 0x3FFF;
@@ -88,6 +91,7 @@ byte PPU::ppu_read(uint16_t addr, bool read_only)
     }
 }
 
+//called very often so in line is needed
 void PPU::ppu_write(uint16_t addr, uint8_t data)
 {
    // Serial.println("PPU WRITE");
@@ -264,94 +268,6 @@ void PPU::write_from_cpu(byte addr, byte data)
 
 void PPU::execute()
 {
-    auto clock_shifters = [&]()
-    {
-        // Every clock while rendering is enabled the internal shift registers shift one bit to the left
-        if (mask.render_background)
-        {
-            bgs_pattern_l <<= 1;
-            bgs_pattern_h <<= 1;
-            bgs_attribute_h <<= 1;
-            bgs_attribute_l <<= 1;
-        }
-        if (mask.render_sprites && dots >= 1 && dots < 258)
-        {
-            for (int i = 0; i < sprite_cnt; i++)
-            {
-                if (sprites_on_scanline[i].x > 0)
-                    sprites_on_scanline[i].x--;
-                else
-                {
-                    sp_pattern_l[i] <<= 1;
-                    sp_pattern_h[i] <<= 1;
-                }
-            }
-        }
-    };
-
-    auto load_bg_shifters = [&]()
-    {
-        bgs_pattern_l = (bgs_pattern_l & 0xFF00) | bg_next_tile_lsb;
-        bgs_pattern_h = (bgs_pattern_h & 0xFF00) | bg_next_tile_msb;
-        bgs_attribute_l = (bgs_attribute_l & 0xFF00) | ((bg_next_tile_attrib & 0b01) ? 0xFF : 0x00); // The lsbit of the attribute is mirrored 8 times
-        bgs_attribute_h = (bgs_attribute_h & 0xFF00) | ((bg_next_tile_attrib & 0b10) ? 0xFF : 0x00);
-    };
-
-    auto transfer_address_x = [&]()
-    {
-        if (mask.render_background || mask.render_sprites)
-        {
-            vaddr.nametable_x = taddr.nametable_x;
-            vaddr.coarse_x = taddr.coarse_x;
-        }
-    };
-
-    auto increment_scroll_x = [&]()
-    {
-        if (mask.render_background)
-        {
-            if (vaddr.coarse_x == 31)
-            {
-                vaddr.coarse_x = 0;
-                vaddr.nametable_x = ~vaddr.nametable_x;
-            }
-            else
-                vaddr.coarse_x++;
-        }
-    };
-
-    auto increment_scroll_y = [&]()
-    {
-        if (mask.render_background)
-        {
-            if (vaddr.fine_y < 7)
-                vaddr.fine_y++;
-            else
-            {
-                vaddr.fine_y = 0;
-                if (vaddr.coarse_y == 29)
-                {
-                    vaddr.coarse_y = 0;
-                    vaddr.nametable_y = ~vaddr.nametable_y;
-                }
-                else if (vaddr.coarse_y == 31)
-                {
-                    vaddr.coarse_y = 0;
-                }
-                else
-                    vaddr.coarse_y++;
-            }
-        }
-    };
-    auto transfer_address_y = [&]()
-    {
-        if (mask.render_background | mask.render_sprites)
-        {
-            vaddr.nametable_y = taddr.nametable_y;
-            vaddr.coarse_y = taddr.coarse_y;
-            vaddr.fine_y = taddr.fine_y;
-        }
-    };
     if (scanline >= -1 && scanline < 240)
     {
         if (scanline == 0 && dots == 0)
@@ -425,7 +341,8 @@ void PPU::execute()
         }
         if (scanline >= 0 && dots == 257) // Do the sprite evaluation at the end of the scanline
         {
-            std::memset(sprites_on_scanline, 0xFF, 8*sizeof(_OAM));
+            //std::memset(sprites_on_scanline, 0xFF, 8*sizeof(_OAM));
+            init_sprites_on_scanline();
             sprite_cnt = 0;
             for (int i = 0; i < 8; i++)
             {
@@ -434,6 +351,8 @@ void PPU::execute()
             }
             byte i = 0;
             sprite_zero_on_scanline = false;
+            uint32_t* dst = (uint32_t*)sprites_on_scanline;
+            uint32_t* src = (uint32_t*)OAM;
             // count to nine in case sprite overflow needs to be set
             while (i < 64 && sprite_cnt < 9)
             {
@@ -448,9 +367,8 @@ void PPU::execute()
                         {
                             sprite_zero_on_scanline = true;
                         }
-                        // TODO check if this is valid syntax.
-                        // sprites_on_scanline[sprite_cnt] = OAM[i];
-                        memcpy(&sprites_on_scanline[sprite_cnt], &OAM[i], sizeof(_OAM));
+                        //memcpy(&sprites_on_scanline[sprite_cnt], &OAM[i], sizeof(_OAM));
+                        dst[sprite_cnt] = src[i];
                         sprite_cnt++;
                     }
                 }
@@ -507,18 +425,8 @@ void PPU::execute()
 
                 if (sprites_on_scanline[i].attributes & 0x40) // if using ohorizontal flipping, the bytes of the pattern are flipped
                 {
-                    auto flip_byte = [](byte x) -> byte
-                    {
-                        byte aux = 0x00;
-                        for (int t = 7; t >= 0; t--)
-                        {
-                            aux = aux | ((x & 1) << t);
-                            x = x >> 1;
-                        }
-                        return aux;
-                    };
-                    sp_pattern_bits_l = flip_byte(sp_pattern_bits_l);
-                    sp_pattern_bits_h = flip_byte(sp_pattern_bits_h);
+                    sp_pattern_bits_l = flip_byte[sp_pattern_bits_l];
+                    sp_pattern_bits_h = flip_byte[sp_pattern_bits_h];
                 }
                 sp_pattern_l[i] = sp_pattern_bits_l;
                 sp_pattern_h[i] = sp_pattern_bits_h;
@@ -532,9 +440,6 @@ void PPU::execute()
         if (scanline == VISIBLE_SCANLINES + 1 && dots == 1)
         {
             set_vblank();
-
-            // if (pause_after_frame)
-            //     SDL::state = PAUSED;
             if (control.enable_nmi == 1)
             {
                 cpu.enqueue_nmi();
@@ -656,12 +561,137 @@ void PPU::execute()
     }
 }
 
-void PPU::set_vblank()
+
+
+//HELPER FUNCTIONS 
+byte flip_byte_fn(byte x)
+{
+    byte aux = 0x00;
+    for (int t = 7; t >= 0; t--)
+    {
+        aux = aux | ((x & 1) << t);
+        x = x >> 1;
+    }
+    return aux;
+}
+
+void PPU::generate_flip_byte_lt()
+{
+    for (int i = 0; i < 255; i++)
+    {
+        flip_byte[i] = flip_byte_fn(i);
+    }
+}
+
+void PPU::clock_shifters()
+{
+    if (mask.render_background)
+    {
+        bgs_pattern_l <<= 1;
+        bgs_pattern_h <<= 1;
+        bgs_attribute_h <<= 1;
+        bgs_attribute_l <<= 1;
+    }
+    if (mask.render_sprites && dots >= 1 && dots < 258)
+    {
+        for (int i = 0; i < sprite_cnt; i++)
+        {
+            if (sprites_on_scanline[i].x > 0)
+                sprites_on_scanline[i].x--;
+            else
+            {
+                sp_pattern_l[i] <<= 1;
+                sp_pattern_h[i] <<= 1;
+            }
+        }
+    }
+}
+
+inline void PPU::load_bg_shifters()
+{
+    bgs_pattern_l = (bgs_pattern_l & 0xFF00) | bg_next_tile_lsb;
+    bgs_pattern_h = (bgs_pattern_h & 0xFF00) | bg_next_tile_msb;
+    bgs_attribute_l = (bgs_attribute_l & 0xFF00) | ((bg_next_tile_attrib & 0b01) ? 0xFF : 0x00); // The lsbit of the attribute is mirrored 8 times
+    bgs_attribute_h = (bgs_attribute_h & 0xFF00) | ((bg_next_tile_attrib & 0b10) ? 0xFF : 0x00);
+}
+
+inline void PPU::transfer_address_x()
+{
+    if (mask.render_background || mask.render_sprites)
+    {
+        vaddr.nametable_x = taddr.nametable_x;
+        vaddr.coarse_x = taddr.coarse_x;
+    }
+}
+
+inline void PPU::increment_scroll_x()
+{
+    if (mask.render_background)
+    {
+        if (vaddr.coarse_x == 31)
+        {
+            vaddr.coarse_x = 0;
+            vaddr.nametable_x = ~vaddr.nametable_x;
+        }
+        else
+            vaddr.coarse_x++;
+    }
+}
+
+inline void PPU::increment_scroll_y()
+{
+    if (mask.render_background)
+    {
+        if (vaddr.fine_y < 7)
+            vaddr.fine_y++;
+        else
+        {
+            vaddr.fine_y = 0;
+            if (vaddr.coarse_y == 29)
+            {
+                vaddr.coarse_y = 0;
+                vaddr.nametable_y = ~vaddr.nametable_y;
+            }
+            else if (vaddr.coarse_y == 31)
+            {
+                vaddr.coarse_y = 0;
+            }
+            else
+                vaddr.coarse_y++;
+        }
+    }
+}
+
+inline void PPU::transfer_address_y()
+{
+    if (mask.render_background | mask.render_sprites)
+    {
+        vaddr.nametable_y = taddr.nametable_y;
+        vaddr.coarse_y = taddr.coarse_y;
+        vaddr.fine_y = taddr.fine_y;
+    }
+};
+
+inline void PPU::set_vblank()
 {
     status.vertical_blank = 1;
 }
 
-void PPU::clear_vblank()
+inline void PPU::clear_vblank()
 {
     status.vertical_blank = 0;
+}
+
+inline void PPU::init_sprites_on_scanline()
+{
+    uint32_t* pointer = (uint32_t *)sprites_on_scanline;
+    pointer[0] = 0xFFFFFFFF;
+    pointer[1] = 0xFFFFFFFF;
+    pointer[2] = 0xFFFFFFFF;
+    pointer[3] = 0xFFFFFFFF;
+    pointer[4] = 0xFFFFFFFF;
+    pointer[5] = 0xFFFFFFFF;
+    pointer[6] = 0xFFFFFFFF;
+    pointer[7] = 0xFFFFFFFF; 
+    //std::memset(sprites_on_scanline, 0xFF, 8 * sizeof(_OAM));
 }

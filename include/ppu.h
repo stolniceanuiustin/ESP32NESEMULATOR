@@ -20,6 +20,8 @@ class CPU;
 
 typedef uint8_t byte;
 
+
+//this is size 4 
 struct _OAM
 {
     byte y;
@@ -136,6 +138,10 @@ public:
         scanline = 0;
         dots = 0;
         fine_x = 0;
+
+        generate_flip_byte_lt();
+
+
         for (int i = 0; i < 64; i++)
         {
             OAM[i].y = 0x00;
@@ -209,6 +215,19 @@ public:
     void ppu_write(uint16_t addr, byte data);
     //LOG ppu_log;
     void hexdump();
+
+    //PPU Helper functions and variables
+    byte flip_byte[256];
+    void generate_flip_byte_lt();
+    void clock_shifters();
+    inline void load_bg_shifters();
+    inline void transfer_address_x();
+    inline void increment_scroll_x();
+    inline void increment_scroll_y();
+    inline void transfer_address_y();
+
+    //void memset_loop_unrolled(); //This is specifically for PPU
+    void init_sprites_on_scanline();
 
 private:
     enum State
