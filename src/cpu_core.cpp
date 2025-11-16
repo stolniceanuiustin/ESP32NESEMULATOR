@@ -16,10 +16,34 @@
 using std::cout;
 
 const uint16_t null_address = 0;
-byte CPU::read(uint16_t address) { return bus->cpu_read(address); }
-void CPU::write(uint16_t address, byte data) { bus->cpu_write(address, data); }
 
-byte CPU::read_pc()
+
+void cpu_init() {
+	SP = 0xFD;
+	PC = read_abs_address(RESET_VECTOR);
+	pending_nmi = false;
+}
+void cpu_reset() {
+	A = 0;
+	X = 0;
+	Y = 0;
+	SP = 0xFD;	// it decreases with pushing
+	PC = read_abs_address(RESET_VECTOR);
+	C = 0;	// carry
+	Z = 0;	// zero
+	I = 1;
+	D = 0;
+	B = 0;
+	O = 0;
+	N = 0;
+	bus_reset();
+	cycles = 0;
+	elapsed_cycles = 0;
+	estimated_cycles = 0;
+	state = FETCH_INSTRUCTION;
+}
+
+byte read_pc()
 {
     byte val = read(PC);
     PC++;
@@ -27,28 +51,28 @@ byte CPU::read_pc()
 }
 
 // stack opperatons. remember, addresses are 16 bit wide!
-void CPU::push(byte x)
+void push(byte x)
 {
     // Stack overflow should handle itself
-    write(0x0100 + SP, x);
+    cpu_write(0x0100 + SP, x);
     SP--;
 }
 
-void CPU::push_address(uint16_t address)
+void push_address(uint16_t address)
 {
-    write(0x0100 + SP, (address & 0xFF00) >> 8);
+    cpu_write(0x0100 + SP, (address & 0xFF00) >> 8);
     SP--;
-    write(0x0100 + SP, address & 0x00FF);
+    cpu_write(0x0100 + SP, address & 0x00FF);
     SP--;
 }
 
-byte CPU::pop()
+byte pop()
 {
     SP++;
     byte to_return = read(0x0100 + SP);
     return to_return;
 }
-uint16_t CPU::pop_address()
+uint16_t pop_address()
 {
     byte low_byte = pop();
     byte high_byte = pop();
@@ -58,7 +82,7 @@ uint16_t CPU::pop_address()
 }
 
 // TODO : DO NOT USE THIS
-void CPU::hexdump()
+void hexdump()
 {
     // FILE *cpu_fullhexdump = fopen("cpuhexdumpfull", "wb");
     for (int i = 0; i <= 0xFFFF; i++)
@@ -67,7 +91,7 @@ void CPU::hexdump()
     }
 }
 
-uint16_t CPU::read_address(byte offset)
+uint16_t read_address(byte offset)
 {
     uint16_t val = read(offset + 1); // little endian
     val <<= 8;
@@ -77,7 +101,7 @@ uint16_t CPU::read_address(byte offset)
 
 // The difference between read_address and read_abs_address is that
 // read_abs_address takes a 16bit offset(reads the absolute address)
-uint16_t CPU::read_abs_address(uint16_t offset)
+uint16_t read_abs_address(uint16_t offset)
 {
     uint16_t val = read(offset + 1); // little endian
     val <<= 8;
@@ -85,14 +109,14 @@ uint16_t CPU::read_abs_address(uint16_t offset)
     return val;
 }
 
-uint16_t CPU::read_address_from_pc()
+uint16_t read_address_from_pc()
 {
     uint16_t address = read_abs_address(PC);
     PC += 2;
     return address;
 }
 
-bool CPU::reset()
+bool reset()
 {
     A = 0;
     X = 0;
@@ -106,7 +130,7 @@ bool CPU::reset()
     B = 0;
     O = 0;
     N = 0;
-    bus->reset();
+    bus_reset();
     cycles = 0;
     elapsed_cycles = 0;
     estimated_cycles = 0;
@@ -114,7 +138,7 @@ bool CPU::reset()
     return true;
 }
 
-void CPU::run_instruction_group1(uint16_t address, bool page_cross)
+void run_instruction_group1(uint16_t address, bool page_cross)
 {
     switch (inst.aaa)
     {
@@ -145,7 +169,7 @@ void CPU::run_instruction_group1(uint16_t address, bool page_cross)
     }
 }
 
-void CPU::run_instruction_group2(uint16_t address, bool page_cross, bool accumulator)
+void run_instruction_group2(uint16_t address, bool page_cross, bool accumulator)
 {
     switch (inst.aaa)
     {
@@ -177,7 +201,7 @@ void CPU::run_instruction_group2(uint16_t address, bool page_cross, bool accumul
     return;
 }
 
-void CPU::run_instruction_group3(uint16_t address, bool page_cross)
+void run_instruction_group3(uint16_t address, bool page_cross)
 {
     uint16_t jump_address = 0;
     switch (inst.aaa)
@@ -212,7 +236,7 @@ void CPU::run_instruction_group3(uint16_t address, bool page_cross)
     return;
 }
 
-void CPU::run_instruction_group_sb1()
+void run_instruction_group_sb1()
 {
     switch (inst.opcode)
     {
@@ -269,7 +293,7 @@ void CPU::run_instruction_group_sb1()
     }
 }
 
-void CPU::run_instruction_group_sb2()
+void run_instruction_group_sb2()
 {
     switch (inst.opcode)
     {
@@ -296,14 +320,14 @@ void CPU::run_instruction_group_sb2()
     }
 }
 
-void CPU::init()
+void init()
 {
     SP = 0xFD;
     PC = read_abs_address(0xFFFC);
     pending_nmi = false;
 }
 
-CPU_VARS CPU::pack_vars()
+CPU_VARS pack_vars()
 {
     CPU_VARS t = {0};
     t.A = A;
@@ -319,7 +343,7 @@ CPU_VARS CPU::pack_vars()
 // This function runes one opcode, not one cycle. My emulator does not aim to be
 // cycle accurate CPU EXECUTE NOW DOES ONLY ONE CLOCK
 
-void CPU::clock()
+void cpu_clock()
 {
     if (state == FETCH_INSTRUCTION)
     {
@@ -343,13 +367,13 @@ void CPU::clock()
     if (state == EXECUTE)
     {
         state = FETCH_INSTRUCTION;
-        execute();
+        cpu_execute();
     }
 }
 
 
 // TODO: CHange this to be a boolean.
-void CPU::execute()
+void cpu_execute()
 {
     CPU_VARS cpu_old_vars;
     if (pending_nmi == true)
@@ -477,41 +501,7 @@ void CPU::execute()
 }
 
 
-std::string CPU::clock(bool debug)
-{
-    if (state == FETCH_INSTRUCTION)
-    {
-        fetch_instruction();
-        estimated_cycles = estimate_cycles();
-        if (estimated_cycles == -1)
-        {
-            int t = 0;
-            std::cout << "INCORRECT CYCLE ESTIMATION\n";
-            estimated_cycles = 2;
-        }
-        elapsed_cycles = 1;
-        state = WAIT_FOR_N_CYCLES;
-        return "FETCHING INSTRUCTION";
-    }
-    else if (state == WAIT_FOR_N_CYCLES)
-    {
-        elapsed_cycles++;
-        if (elapsed_cycles == estimated_cycles)
-        {
-            state = EXECUTE;
-        }
-        else
-            return "WAITING FOR N CYCLES";
-    }
-    if (state == EXECUTE)
-    {
-        state = FETCH_INSTRUCTION;
-        return execute(debug);
-    }
-    return "INVALID CPU STATE";
-}
-
-void CPU::fetch_instruction()
+void fetch_instruction()
 {
     inst.opcode = read(PC);
     inst.aaa = (0xE0 & inst.opcode) >> 5;      // first 3 bits of the opcode
@@ -522,3 +512,7 @@ void CPU::fetch_instruction()
 }
 
 
+byte ram_at(uint16_t address)
+{
+    return cpu_read(address);
+}

@@ -1,9 +1,17 @@
 #include "cartridge.h"
-#include "mapper.h"
 #include <Arduino.h>
 #include <LittleFS.h>
+#include "memory.h"
 // Nametable_Map definition assumed to be in mapper.h or cartridge.h
 Nametable_Map nametablee;
+
+
+#include "cartridge.h"
+
+
+Config config;
+MIRROR mirroring;
+
 
 void set_mapping(uint16_t top_left, uint16_t top_right, uint16_t bottom_left, uint16_t bottom_right)
 {
@@ -13,9 +21,10 @@ void set_mapping(uint16_t top_left, uint16_t top_right, uint16_t bottom_left, ui
     nametablee.map[3] = bottom_right;
 }
 
-bool CARTRIDGE::read_file()
+bool cartridge_read_file(char* rom_name)
 {
-    File rom = LittleFS.open(config.rom_name, "r");
+    Serial.printf("%s - ROM NAME\n", rom_name);
+    File rom = LittleFS.open(rom_name, "r");
     if (!rom)
     {
         Serial.println("Could not open ROM FILE");
@@ -33,26 +42,25 @@ bool CARTRIDGE::read_file()
         return false;
     }
 
-    
     Serial.print((int)header.flags6);
     Serial.print(" ");
-    Serial.println((int)header.flags7); 
-    
+    Serial.println((int)header.flags7);
+
     // Skip Trainer if present (Flags 6 bit 2 is set)
-    if (header.flags6 & 0x04) 
+    if (header.flags6 & 0x04)
     {
         Serial.println("Skipping 512-byte Trainer.");
         rom.seek(512, SeekCur);
     }
-    
+
     byte mapper_type = ((header.flags6 & 0b11110000) >> 4) | (header.flags7 & 0b11110000);
     Serial.print("Mapper_type: ");
     Serial.println((int)mapper_type);
-    
+
     byte nametable_type = (header.flags6 & 1);
     if (nametable_type == 0)
     {
-      
+
         Serial.println("Using vertical mirroring");
         mirroring = VERTICAL;
         set_mapping(0, 0x400, 0, 0x400);
@@ -68,37 +76,34 @@ bool CARTRIDGE::read_file()
     if (mapper_type == 0)
     {
         Serial.println("Using mappertype 0");
-        p_mapper = std::make_shared<Mapper0>(header.prg_size, header.chr_size);
-        mapper0(config, *this, rom);
+        // p_mapper = std::make_shared<Mapper0>(header.prg_size, header.chr_size);
+        int prg_size = header.prg_size * PRG_BANK_SIZE;
+        int chr_size = header.chr_size * CHR_BANK_SIZE;
+
+        if (rom.read(reinterpret_cast<byte *>(PRGrom), prg_size) != prg_size)
+        {
+            Serial.println("FAILED: PRG ROM read size mismatch.");
+            return false;
+        }
+        if (prg_size == PRG_BANK_SIZE)
+        {
+            Serial.println("NROM-128 detected: Mirroring 16KB PRG.");
+            std::memcpy(PRGrom + PRG_BANK_SIZE, PRGrom, PRG_BANK_SIZE);
+        }
+        if (chr_size > 0 && chr_size <= CHR_BANK_SIZE)
+        {
+            if (rom.read(reinterpret_cast<byte *>(CHRrom), chr_size) != chr_size)
+            {
+                Serial.println("FAILED: CHR ROM read size mismatch.");
+                return false;
+            }
+        }
+        else
+        {
+            Serial.println("CHR-Ram is present, so the mapper is not correct!");
+        }
     }
-    else if (mapper_type == 1)
-    {
-        Serial.println("Using mappertype 1");
-        p_mapper = std::make_shared<Mapper1>(header.prg_size, header.chr_size);
-        mapper1(config, *this, rom);
-    }
-    
+
     rom.close();
     return true;
-}
-
-byte CARTRIDGE::cpu_read(uint16_t addr)
-{
-    uint16_t mapped_addr = p_mapper->cpu_map_read(addr);
-    return PRGrom[mapped_addr];
-}
-void CARTRIDGE::cpu_write(uint16_t addr, byte data)
-{
-    uint16_t mapped_addr = p_mapper->cpu_map_write(addr);
-    PRGrom[mapped_addr] = data;
-}
-byte CARTRIDGE::ppu_read(uint16_t addr)
-{
-    uint16_t mapped_addr = p_mapper->ppu_map_read(addr);
-    return CHRrom[mapped_addr];
-}
-void CARTRIDGE::ppu_write(uint16_t addr, byte data)
-{
-    uint16_t mapped_addr = p_mapper->ppu_map_write(addr);
-    CHRrom[mapped_addr] = data;
 }

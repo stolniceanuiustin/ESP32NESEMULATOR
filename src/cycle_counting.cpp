@@ -2,7 +2,7 @@
 
 //This file contains the logic to count cycles for each instruciton 
 
-bool CPU::estimate_page_cross_g1() {
+bool estimate_page_cross_g1() {
 	bool page_cross = false;
 	uint16_t address = 0x0000;
 	uint16_t aux_pc = 0x0000;
@@ -71,7 +71,7 @@ bool CPU::estimate_page_cross_g1() {
 	return false;
 }
 
-bool CPU::estimate_page_cross_g23() {
+bool estimate_page_cross_g23() {
 	uint16_t address = 0;
 	uint16_t aux_pc = PC;
 	bool page_cross = false;
@@ -133,7 +133,7 @@ bool CPU::estimate_page_cross_g23() {
 	return false;
 }
 
-int CPU::estimate_cycles_group_sb1() {
+int estimate_cycles_group_sb1() {
 	switch (inst.opcode) {
 		case 0x08:
 			return 3;
@@ -182,11 +182,11 @@ int CPU::estimate_cycles_group_sb1() {
 	}
 }
 
-int CPU::estimate_cycles_group_sb2() {
+int estimate_cycles_group_sb2() {
 	return 2;
 }
 
-int CPU::estimate_cycles_group_1() {
+int estimate_cycles_group_1() {
 	const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
 	switch (inst.aaa) {
 		case 0x0:
@@ -211,7 +211,7 @@ int CPU::estimate_cycles_group_1() {
 	return 2;
 }
 
-int CPU::estimate_cycles_group_2() {
+int estimate_cycles_group_2() {
 	const int lookup[] = {-1, 5, 2, 6, -1, 6, -1, 7};
 	switch (inst.aaa) {
 		case 0x0:
@@ -241,7 +241,7 @@ int CPU::estimate_cycles_group_2() {
 	return 2;
 }
 
-int CPU::estimate_cycles_group_3() {
+int estimate_cycles_group_3() {
 	uint16_t jump_address = 0;
 	const int lookup[] = {2, 3, -1, 4, -1, 4, -1, 4};
 	switch (inst.aaa) {
@@ -270,7 +270,7 @@ int CPU::estimate_cycles_group_3() {
 	return 2;
 }
 
-int CPU::estimate_cycles() {
+int estimate_cycles() {
 	byte last_5_bits = (0b00011111 & inst.opcode);
 	byte low_nibble = inst.opcode & 0x0F;
 	byte high_nibble = inst.opcode >> 4;

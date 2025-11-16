@@ -6,7 +6,7 @@
 
 const byte last_byte = 0xFF; // 00...011111111
 
-uint16_t CPU::compute_addr_mode_g1(bool &page_cross)
+uint16_t compute_addr_mode_g1(bool &page_cross)
 {
     uint16_t address = 0; // The first byte must be 0
     page_cross = false;
@@ -85,7 +85,7 @@ uint16_t CPU::compute_addr_mode_g1(bool &page_cross)
     return address;
 }
 
-bool CPU::compute_addr_mode_g23(bool &page_cross, uint16_t &address_to_return)
+bool compute_addr_mode_g23(bool &page_cross, uint16_t &address_to_return)
 {
     uint16_t address = 0;
     page_cross = false;

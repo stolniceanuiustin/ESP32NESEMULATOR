@@ -70,23 +70,23 @@ void PS2::readController() {
 
   digitalWrite(PS2_ATT, HIGH);
 
-  if (!(buttonsLow & 0x01)) Serial.print("SELECT ");
-  if (!(buttonsLow & 0x02)) Serial.print("L3 ");
-  if (!(buttonsLow & 0x04)) Serial.print("R3 ");
-  if (!(buttonsLow & 0x08)) Serial.print("START ");
-  if (!(buttonsLow & 0x10)) Serial.print("UP ");
-  if (!(buttonsLow & 0x20)) Serial.print("RIGHT ");
-  if (!(buttonsLow & 0x40)) Serial.print("DOWN ");
-  if (!(buttonsLow & 0x80)) Serial.print("LEFT ");
+//   if (!(buttonsLow & 0x01)) Serial.print("SELECT ");
+//   if (!(buttonsLow & 0x02)) Serial.print("L3 ");
+//   if (!(buttonsLow & 0x04)) Serial.print("R3 ");
+//   if (!(buttonsLow & 0x08)) Serial.print("START ");
+//   if (!(buttonsLow & 0x10)) Serial.print("UP ");
+//   if (!(buttonsLow & 0x20)) Serial.print("RIGHT ");
+//   if (!(buttonsLow & 0x40)) Serial.print("DOWN ");
+//   if (!(buttonsLow & 0x80)) Serial.print("LEFT ");
 
-  if (!(buttonsHigh & 0x01)) Serial.print("L2 ");
-  if (!(buttonsHigh & 0x02)) Serial.print("R2 ");
-  if (!(buttonsHigh & 0x04)) Serial.print("L1 ");
-  if (!(buttonsHigh & 0x08)) Serial.print("R1 ");
-  if (!(buttonsHigh & 0x10)) Serial.print("TRIANGLE ");
-  if (!(buttonsHigh & 0x20)) Serial.print("CIRCLE ");
-  if (!(buttonsHigh & 0x40)) Serial.print("CROSS ");
-  if (!(buttonsHigh & 0x80)) Serial.print("SQUARE ");
+//   if (!(buttonsHigh & 0x01)) Serial.print("L2 ");
+//   if (!(buttonsHigh & 0x02)) Serial.print("R2 ");
+//   if (!(buttonsHigh & 0x04)) Serial.print("L1 ");
+//   if (!(buttonsHigh & 0x08)) Serial.print("R1 ");
+//   if (!(buttonsHigh & 0x10)) Serial.print("TRIANGLE ");
+//   if (!(buttonsHigh & 0x20)) Serial.print("CIRCLE ");
+//   if (!(buttonsHigh & 0x40)) Serial.print("CROSS ");
+//   if (!(buttonsHigh & 0x80)) Serial.print("SQUARE ");
 
-  Serial.println();
+//   Serial.println();
 }

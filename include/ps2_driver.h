@@ -13,7 +13,7 @@ class PS2 {
         void readController();
         bool buttonIsPressed(String btn);
         
-    private:
+    public:
         int PS2_DAT, PS2_CMD, PS2_ATT, PS2_CLK;
         int PS2_DELAY;
         

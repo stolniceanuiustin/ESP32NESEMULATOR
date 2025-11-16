@@ -39,5 +39,5 @@ struct NESHeader
 };
 #pragma pack(pop)
 
-void init_sdl();
+
 #endif

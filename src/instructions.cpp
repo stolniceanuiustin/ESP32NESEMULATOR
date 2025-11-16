@@ -10,14 +10,10 @@
 /*
 ADDRESSED INSTRUCTIONS - THE HARDEST 
 */
-void CPU::set_ZN(byte value)
-{
-    Z = (value == 0) ? 1 : 0;
-    N = (value & 0x80) ? 1 : 0; //Checks bit 7 if it's set or not
-}
+
 
 // GROUP 1 INSTRUCTIOS
-void CPU::ORA(uint16_t address, bool page_cross)
+void ORA(uint16_t address, bool page_cross)
 {
     // OR between accumulator and the contents at the given address
     const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
@@ -27,7 +23,7 @@ void CPU::ORA(uint16_t address, bool page_cross)
     cycles += lookup[inst.bbb] + (int)page_cross;
 }
 
-void CPU::AND(uint16_t address, bool page_cross)
+void AND(uint16_t address, bool page_cross)
 {
     const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
     byte operand = read(address);
@@ -37,7 +33,7 @@ void CPU::AND(uint16_t address, bool page_cross)
     cycles += lookup[inst.bbb] + (int)page_cross;
 }
 
-void CPU::EOR(uint16_t address, bool page_cross)
+void EOR(uint16_t address, bool page_cross)
 {
     const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
     A = A ^ read(address);
@@ -46,7 +42,7 @@ void CPU::EOR(uint16_t address, bool page_cross)
     cycles += lookup[inst.bbb] + (int)page_cross;
 }
 
-void CPU::ADC(uint16_t address, bool page_cross)
+void ADC(uint16_t address, bool page_cross)
 {
     // TODO: TEST THIS
     const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
@@ -61,17 +57,17 @@ void CPU::ADC(uint16_t address, bool page_cross)
     cycles += lookup[inst.bbb] + (int)page_cross;
 }
 
-void CPU::STA(uint16_t address)
+void STA(uint16_t address)
 {
     // Can't use IMEDIATE ADDRESSING
     // Stores the contents of the accumulator in memory
     // Doesnt change flags
     const int lookup[] = {6, 3, -1, 4, 6, 4, 5, 5};
-    write(address, A);
+    cpu_write(address, A);
     cycles += lookup[inst.bbb];
 }
 
-void CPU::LDA(uint16_t address, bool page_cross)
+void LDA(uint16_t address, bool page_cross)
 {
     //Loads A from memory
     const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
@@ -80,7 +76,7 @@ void CPU::LDA(uint16_t address, bool page_cross)
     cycles += lookup[inst.bbb] + (int)page_cross;
 }
 
-void CPU::CMP(uint16_t address, bool page_cross)
+void CMP(uint16_t address, bool page_cross)
 {
     //TODO not sure if the flags are set correctly but i think they are, will find out in unit testing
     const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
@@ -92,7 +88,7 @@ void CPU::CMP(uint16_t address, bool page_cross)
     cycles += lookup[inst.bbb] + (int)page_cross;
 }
 
-void CPU::SBC(uint16_t address, bool page_cross)
+void SBC(uint16_t address, bool page_cross)
 {
     // TODO: TEST THIS
     const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
@@ -110,7 +106,7 @@ void CPU::SBC(uint16_t address, bool page_cross)
 }
 
 
-void CPU::ASL(uint16_t address, bool accumulator)
+void ASL(uint16_t address, bool accumulator)
 {
     // Arithmetic shift left
     // Carry = old bit 7
@@ -135,12 +131,12 @@ void CPU::ASL(uint16_t address, bool accumulator)
             C = 1;
         else
             C = 0;
-        write(address, operand << 1);
+        cpu_write(address, operand << 1);
         set_ZN(read(address));
     }
     cycles += lookup[inst.bbb];
 }
-void CPU::ROL(uint16_t address, bool accumulator)
+void ROL(uint16_t address, bool accumulator)
 {
     // rotate left
     int lookup[] = {-1, 5, 2, 6, -1, 6, -1, 7};
@@ -165,7 +161,7 @@ void CPU::ROL(uint16_t address, bool accumulator)
         operand = operand << 1;
         operand &= ~1;
         operand |= C;
-        write(address, operand);
+        cpu_write(address, operand);
         if (carry_flag)
             C = 1;
         else
@@ -174,7 +170,7 @@ void CPU::ROL(uint16_t address, bool accumulator)
     }
     cycles += lookup[inst.bbb];
 }
-void CPU::LSR(uint16_t address, bool accumulator)
+void LSR(uint16_t address, bool accumulator)
 {
     // Logical shift right
     int lookup[] = {-1, 5, 2, 6, -1, 6, -1, 7};
@@ -196,7 +192,7 @@ void CPU::LSR(uint16_t address, bool accumulator)
         uint16_t carry_flag = operand & 1;
         operand = operand >> 1;
         operand &= ~(1 << 7);
-        write(address, operand);
+        cpu_write(address, operand);
         if (carry_flag)
             C = 1;
         else
@@ -205,7 +201,7 @@ void CPU::LSR(uint16_t address, bool accumulator)
     }
     cycles += lookup[inst.bbb];
 }
-void CPU::ROR(uint16_t address, bool accumulator)
+void ROR(uint16_t address, bool accumulator)
 {
     // Rotate right
     int lookup[] = {-1, 5, 2, 6, -1, 6, -1, 7};
@@ -230,7 +226,7 @@ void CPU::ROR(uint16_t address, bool accumulator)
         operand = operand >> 1;
         operand &= ~(1 << 7);
         operand |= C << 7;
-        write(address, operand);
+        cpu_write(address, operand);
 
         if (carry_flag)
             C = 1;
@@ -241,40 +237,40 @@ void CPU::ROR(uint16_t address, bool accumulator)
 
     cycles += lookup[inst.bbb];
 }
-void CPU::STX(uint16_t address)
+void STX(uint16_t address)
 {
     int lookup[] = {-1, 3, -1, 4, -1, 4, -1, -1};
-    write(address, X);
+    cpu_write(address, X);
     cycles += lookup[inst.bbb];
 }
-void CPU::LDX(uint16_t address, bool page_cross)
+void LDX(uint16_t address, bool page_cross)
 {
     int lookup[] = {2, 3, -1, 4, -1, 4, -1, 4};
     X = read(address);
     set_ZN(X);
     cycles += lookup[inst.bbb] + (int)page_cross;
 }
-void CPU::DECC(uint16_t address)
+void DECC(uint16_t address)
 {
     int lookup[] = {-1, 5, -1, 6, -1, 6, -1, 7};
     byte operand = read(address);
     operand -= 1;
-    write(address, operand);
+    cpu_write(address, operand);
     set_ZN(operand);
     cycles += lookup[inst.bbb];
 }
-void CPU::INC(uint16_t address)
+void INC(uint16_t address)
 {
     int lookup[] = {-1, 5, -1, 6, -1, 6, -1, 7};
     byte operand = read(address);
     operand += 1;
-    write(address, operand);
+    cpu_write(address, operand);
     set_ZN(operand);
     cycles += lookup[inst.bbb];
 }
 
 
-void CPU::BITT(uint16_t address)
+void BITT(uint16_t address)
 {
     // bit test, test if one or more bits are in a target memory location
     // mask patern in A is & with memory to keep zero, overflow, negative etc.
@@ -298,13 +294,13 @@ void CPU::BITT(uint16_t address)
     cycles += lookup[inst.bbb];
 }
 
-void CPU::JMP_abs(uint16_t jump_address)
+void JMP_abs(uint16_t jump_address)
 {
     PC = jump_address;
     cycles += 3;
 }
 
-void CPU::JMP_indirect(uint16_t jump_address)
+void JMP_indirect(uint16_t jump_address)
 {
     // TODO: ADDRESS BUG FROM ORIGINAL 6502(not a bug in my code)
     //PC = read_abs_address(jump_address);
@@ -317,14 +313,14 @@ void CPU::JMP_indirect(uint16_t jump_address)
     cycles += 5;
 }
 
-void CPU::STY(uint16_t address)
+void STY(uint16_t address)
 {
     int lookup[] = {-1, 3, -1, 4, -1, 4, -1, -1};
-    write(address, Y);
+    cpu_write(address, Y);
     cycles += lookup[inst.bbb];
 }
 
-void CPU::LDY(uint16_t address, bool page_cross)
+void LDY(uint16_t address, bool page_cross)
 { // immediate, zeropage, nothig, absolut,nothing, zero page x, nothing, absolut x
     int lookup[] = {2, 3, -1, 4, -1, 4, -1, 4};
     Y = read(address);
@@ -332,7 +328,7 @@ void CPU::LDY(uint16_t address, bool page_cross)
     set_ZN(Y);
 }
 
-void CPU::CPY(uint16_t address)
+void CPY(uint16_t address)
 {
     int lookup[] = {2, 3, -1, 4, -1, -1, -1, -1};
     byte operand = read(address);  
@@ -344,7 +340,7 @@ void CPU::CPY(uint16_t address)
     cycles += lookup[inst.bbb];
 }
 
-void CPU::CPX(uint16_t address)
+void CPX(uint16_t address)
 {
     //TODO FIX THIS THE SAME AS CPY
     int lookup[] = {2, 3, -1, 4, -1, -1, -1, -1};
@@ -361,7 +357,7 @@ void CPU::CPX(uint16_t address)
 Single Byte instructions
 */
 
-byte CPU::pack_flags()
+byte pack_flags()
 {
     byte to_return = 0;
     to_return |= N << 7;
@@ -378,7 +374,7 @@ byte CPU::pack_flags()
 }
 
 
-void CPU::unpack_flags(byte flags)
+void unpack_flags(byte flags)
 {
     N = ((1 << 7) & flags) >> 7;
     O = ((1 << 6) & flags) >> 6;
@@ -389,14 +385,14 @@ void CPU::unpack_flags(byte flags)
     C = 1 & flags;
     return;
 }
-void CPU::PHP()
+void PHP()
 {
     byte to_push = pack_flags();
     push(to_push);
     cycles += 3;
 }
 
-void CPU::PLP()
+void PLP()
 {
     byte flags = pop();
     unpack_flags(flags);
@@ -405,85 +401,85 @@ void CPU::PLP()
 
 }
 
-void CPU::PHA()
+void PHA()
 {
     push(A);
     cycles += 3;
 }
 
-void CPU::PLA()
+void PLA()
 {
     A = pop();
     set_ZN(A);
     cycles += 4;
 }
 
-void CPU::DEY()
+void DEY()
 {
     Y = Y-1;
     set_ZN(Y);
     cycles += 2;
 }
 
-void CPU::TAY()
+void TAY()
 {
     Y = A;
     set_ZN(Y);
     cycles += 2;
 }
 
-void CPU::INY()
+void INY()
 {
     Y = Y+1;
     set_ZN(Y);
     cycles += 2;
 }
 
-void CPU::INX()
+void INX()
 {
     X = X+1;
     set_ZN(X);
     cycles += 2;
 }
 
-void CPU::CLC()
+void CLC()
 {
     C = 0;
     cycles += 2;
 }
 
-void CPU::SEC()
+void SEC()
 {
     C = 1;
     cycles += 2;
 }
 
-void CPU::CLI()
+void CLI()
 {
     I = 0;
     cycles += 2;
 }
 
-void CPU::SEI()
+void SEI()
 {
     I = 1;
     cycles += 2;   
 }
 
-void CPU::TYA()
+void TYA()
 {
     A = Y;
     set_ZN(A);
     cycles += 2;
 }
 
-void CPU::CLV()
+void CLV()
 {
     O = 0;
     cycles += 2;   
 }
 
-void CPU::CLD()
+void CLD()
 {
     //SHOULDNT USE IN NES EMU
     //std::cout << "CLD shouldn't be used\n";
@@ -491,40 +487,40 @@ void CPU::CLD()
     cycles += 2; 
 }
 
-void CPU::SED()
+void SED()
 {
     D = 1;
     cycles += 2;
 }
 
-void CPU::TXA()
+void TXA()
 {
     A = X;
     set_ZN(A);
     cycles += 2;
 }
 
-void CPU::TXS()
+void TXS()
 {
     SP = X;
     cycles += 2;
 }
 
-void CPU::TAX()
+void TAX()
 {
     X = A;
     set_ZN(X);
     cycles += 2;
 }
 
-void CPU::TSX()
+void TSX()
 {
     X = SP;
     set_ZN(X);
     cycles += 2;
 }
 
-void CPU::DEX()
+void DEX()
 {
     X = X-1;
     set_ZN(X);
@@ -534,19 +530,19 @@ void CPU::DEX()
 /*
 interrupts
 */
-void CPU::NOPP()
+void NOPP()
 {
     cycles += 2;
 }
 
-void CPU::JSR_abs(uint16_t address)
+void JSR_abs(uint16_t address)
 {
     push_address(PC);
     PC = address;
     cycles += 6;
 }
 
-void CPU::RTS()
+void RTS()
 {
     uint16_t aux = pop_address();
     aux += 1;
@@ -554,7 +550,7 @@ void CPU::RTS()
     cycles += 6;
 }
 
-void CPU::BRK()
+void BRK()
 {
     int t = 0;
     if(I == 0)
@@ -569,7 +565,7 @@ void CPU::BRK()
 }
 
 
-void CPU::trigger_irq()
+void trigger_irq()
 {
     if(I == 0) //interrupts enabled
     {
@@ -584,7 +580,7 @@ void CPU::trigger_irq()
     }
 }
 
-void CPU::trigger_nmi()
+void trigger_nmi()
 {   //STACK STARTS AT 0xFD
     //std::cout << "===============NMI TRIGGERED===============\n";
     SP = 0xFD;
@@ -597,7 +593,7 @@ void CPU::trigger_nmi()
     pending_nmi = false;
 }
 
-void CPU::RTI()
+void RTI()
 {
     byte flags = pop();
     unpack_flags(flags);

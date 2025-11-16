@@ -1,15 +1,18 @@
 #include "virtual_screen.h"
 
 uint16_t nes_pallete_16[64];
+uint16_t pixels[256 * 240]; // NES resolution framebuffer
+bool RENDER_ENABLED;
 
-Screen::Screen()
+void screen_init()
 {
     for (int i = 0; i < 256 * 240; i++)
-        pixels[i] = 0x0000; 
+        pixels[i] = 0x0000;
     RENDER_ENABLED = false;
+    generate_16bit_pallet();
 }
 
-void Screen::generate_16bit_pallet()
+void generate_16bit_pallet()
 {
     for (int i = 0; i < 64; i++)
     {
@@ -25,13 +28,4 @@ void Screen::generate_16bit_pallet()
 
         nes_pallete_16[i] = (r5 << 11) | (g6 << 5) | b5;
     }
-}
-
-void Screen::set_pixel(uint16_t scanline, uint16_t dot, uint8_t color_index)
-{
-    // Bounds check (optional)
-    if (scanline >= 240 || dot >= 256 || color_index >= 64)
-        return;
-
-    pixels[256 * scanline + dot] = nes_pallete_16[color_index];
 }

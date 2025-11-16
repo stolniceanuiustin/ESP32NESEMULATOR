@@ -2,18 +2,47 @@
 #include "emulator_config.h"
 #include "cpu.h"
 #include <Arduino.h>
-//THIS FILE IS MAGIC. DO NOT CHANGE ANYTHING HERE.
+#include "cartridge.h"
+// THIS FILE IS MAGIC. DO NOT CHANGE ANYTHING HERE.
 
-
-//TODO: Remove all lambdas from this!
-
+// TODO: Remove all lambdas from this!
 
 void clear_status_register(byte &x)
 {
     x &= 0b00011111;
 }
+void ppu_init()
+{
+    current_frame = 0;
+    status.reg = 0b10100000;
+    control.reg = 0x00;
+    mask.reg = 0x00;
+    OAMADDR = 0x00;
+    OAMDATA = 0x00;
+    odd_frame = false;
+    // v = 0;
+    scanline = 0;
+    dots = 0;
+    fine_x = 0;
 
-void PPU::reset()
+    generate_flip_byte_lt();
+
+    for (int i = 0; i < 64; i++)
+    {
+        OAM[i].y = 0x00;
+        OAM[i].x = 0x00;
+        OAM[i].id = 0x00;
+        OAM[i].attributes = 0x00;
+    }
+    for (int i = 0; i < 8; i++)
+    {
+        sprites_on_scanline[i] = {0, 0, 0, 0};
+        sprite_cnt = 0;
+        sp_pattern_h[i] = 0;
+        sp_pattern_l[i] = 0;
+    }
+}
+void ppu_reset()
 {
     control.reg = 0x0000;
     mask.reg = 0x0000;
@@ -33,21 +62,20 @@ void PPU::reset()
         pallete_table[i] = 0;
 }
 
-//Called very much so inline needed
-byte PPU::ppu_read(uint16_t addr, bool read_only)
+// Called very much so inline needed
+byte ppu_read(uint16_t addr /*,bool read_only*/)
 {
     addr &= 0x3FFF;
-    if (addr >= 0x0000 && addr <= 0x1FFF)
+    if (addr >= 0x0000 && addr <= 0x1FFF) // reading in CHRrom(sprites usually)
     {
-        return cartridge->ppu_read(addr);
+        // hardcoding mapper0
+        return CHRrom[addr];
     }
-    else if (addr >= 0x2000 && addr <= 0x3EFF)
+    else if (addr >= 0x2000 && addr <= 0x3EFF) // reading in nametable
     {
-        /*
-            https://www.nesdev.org/wiki/Mirroring
-        */
+        // https://www.nesdev.org/wiki/Mirroring
         addr &= 0x0FFF;
-        if (cartridge->mirroring == HORIZONTAL)
+        if (mirroring == HORIZONTAL)
         {
             if (addr >= 0x0000 && addr <= 0x03FF)
                 return nametable[0][addr & 0x03FF];
@@ -58,7 +86,7 @@ byte PPU::ppu_read(uint16_t addr, bool read_only)
             if (addr >= 0x0C00 && addr <= 0x0FFF)
                 return nametable[1][addr & 0x03FF];
         }
-        else if (cartridge->mirroring == VERTICAL)
+        else if (mirroring == VERTICAL)
         {
             if (addr >= 0x0000 && addr <= 0x03FF)
                 return nametable[0][addr & 0x03FF];
@@ -70,7 +98,7 @@ byte PPU::ppu_read(uint16_t addr, bool read_only)
                 return nametable[1][addr & 0x03FF];
         }
     }
-    else if (addr >= 0x3F00 && addr <= 0x3FFF)
+    else if (addr >= 0x3F00 && addr <= 0x3FFF) // reading in pallete table
     {
         addr &= 0x001F;
         // mirroring:
@@ -91,24 +119,20 @@ byte PPU::ppu_read(uint16_t addr, bool read_only)
     }
 }
 
-//called very often so in line is needed
-void PPU::ppu_write(uint16_t addr, uint8_t data)
+// called very often so in line is needed
+void ppu_write(uint16_t addr, uint8_t data)
 {
-   // Serial.println("PPU WRITE");
+    // Serial.println("PPU WRITE");
     addr &= 0x3FFF;
-    if (addr >= 0x0000 && addr <= 0x1FFF)
-    {
-        cartridge->ppu_write(addr, data);
-       // Serial.println("Writing to cartridge ROM. should not get here in normal circumstances");
-    }
-    else if (addr >= 0x2000 && addr <= 0x3EFF)
+
+    if (addr >= 0x2000 && addr <= 0x3EFF)
     {
         /*
             https://www.nesdev.org/wiki/Mirroring
         */
         // std::cout << "Writing to nametable memory\n";
         addr &= 0x0FFF;
-        if (cartridge->mirroring == HORIZONTAL)
+        if (mirroring == HORIZONTAL)
         {
             if (addr >= 0x0000 && addr <= 0x03FF)
                 nametable[0][addr & 0x03FF] = data;
@@ -119,17 +143,17 @@ void PPU::ppu_write(uint16_t addr, uint8_t data)
             if (addr >= 0x0C00 && addr <= 0x0FFF)
                 nametable[1][addr & 0x03FF] = data;
         }
-        else if (cartridge->mirroring == VERTICAL)
+        else if (mirroring == VERTICAL)
         {
             if (addr >= 0x0000 && addr <= 0x07FF)
                 nametable[0][addr & 0x03FF] = data;
-            else if(addr >= 0x800 && addr <= 0xFFF)
+            else if (addr >= 0x800 && addr <= 0xFFF)
                 nametable[1][addr & 0x03FF] = data;
         }
     }
     else if (addr >= 0x3F00 && addr <= 0x3FFF)
     {
-        //Serial.println("Writing to pallete table at addr: " + String(addr, HEX) + " Data: " + String(data, HEX));
+        // Serial.println("Writing to pallete table at addr: " + String(addr, HEX) + " Data: " + String(data, HEX));
         addr &= 0x001F;
         // mirroring:
         if (addr == 0x10)
@@ -142,9 +166,15 @@ void PPU::ppu_write(uint16_t addr, uint8_t data)
             addr = 0x0C;
         pallete_table[addr] = data;
     }
+    else if (addr >= 0x0000 && addr <= 0x1FFF)
+    {
+        // Mapper0 games dont write to this zone
+        ppu_write(addr, data);
+        Serial.println("========Writing to cartridge ROM. should not get here in normal circumstances!!!!=======");
+    }
 }
 
-byte PPU::read_from_cpu(byte addr, bool read_only)
+byte ppu_read_from_cpu(byte addr, bool read_only)
 {
     byte data = 0x00;
     if (read_only == true)
@@ -212,9 +242,9 @@ byte PPU::read_from_cpu(byte addr, bool read_only)
     return data;
 }
 
-void PPU::write_from_cpu(byte addr, byte data)
+void ppu_write_from_cpu(byte addr, byte data)
 {
-    //Serial.println("PPU WRITE FROM CPU");
+    // Serial.println("PPU WRITE FROM CPU");
     switch (addr)
     {
     case 0:
@@ -266,7 +296,7 @@ void PPU::write_from_cpu(byte addr, byte data)
     }
 }
 
-void PPU::execute()
+void ppu_execute()
 {
     if (scanline >= -1 && scanline < 240)
     {
@@ -294,7 +324,7 @@ void PPU::execute()
                 // Nametable fetch. The ppu has to fetch the next tile id from the nametable. Using the tile id it will fetch the bits from the nametable
                 load_bg_shifters();
                 // only 12 bit addressing for the ppu memory
-                bg_next_tile_id = ppu_read(0x2000 | (vaddr.reg & 0x0FFF), false);
+                bg_next_tile_id = ppu_read(0x2000 | (vaddr.reg & 0x0FFF));
 
                 break;
             case 2:
@@ -341,7 +371,7 @@ void PPU::execute()
         }
         if (scanline >= 0 && dots == 257) // Do the sprite evaluation at the end of the scanline
         {
-            //std::memset(sprites_on_scanline, 0xFF, 8*sizeof(_OAM));
+            // std::memset(sprites_on_scanline, 0xFF, 8*sizeof(_OAM));
             init_sprites_on_scanline();
             sprite_cnt = 0;
             for (int i = 0; i < 8; i++)
@@ -351,8 +381,8 @@ void PPU::execute()
             }
             byte i = 0;
             sprite_zero_on_scanline = false;
-            uint32_t* dst = (uint32_t*)sprites_on_scanline;
-            uint32_t* src = (uint32_t*)OAM;
+            uint32_t *dst = (uint32_t *)sprites_on_scanline;
+            uint32_t *src = (uint32_t *)OAM;
             // count to nine in case sprite overflow needs to be set
             while (i < 64 && sprite_cnt < 9)
             {
@@ -367,7 +397,7 @@ void PPU::execute()
                         {
                             sprite_zero_on_scanline = true;
                         }
-                        //memcpy(&sprites_on_scanline[sprite_cnt], &OAM[i], sizeof(_OAM));
+                        // memcpy(&sprites_on_scanline[sprite_cnt], &OAM[i], sizeof(_OAM));
                         dst[sprite_cnt] = src[i];
                         sprite_cnt++;
                     }
@@ -376,7 +406,7 @@ void PPU::execute()
             }
             status.sprite_overflow = (sprite_cnt > 8);
         }
-        
+
         if (dots == 340)
         {
             for (int i = 0; i < sprite_cnt; i++)
@@ -442,7 +472,7 @@ void PPU::execute()
             set_vblank();
             if (control.enable_nmi == 1)
             {
-                cpu.enqueue_nmi();
+                enqueue_nmi();
             }
         }
     }
@@ -541,11 +571,11 @@ void PPU::execute()
         byte color = 0;
         if (pixel != 0)
         {
-            color = ppu_read(0x3F00 + (pallete << 2) + pixel, false) & 0x3F;
+            color = ppu_read(0x3F00 + (pallete << 2) + pixel) & 0x3F;
         }
         else
-            color = ppu_read(0x3F00, false) & 0x3F;
-        screen.set_pixel(scanline, dots - 1, color);
+            color = ppu_read(0x3F00) & 0x3F;
+        screen_set_pixel(scanline, dots - 1, color);
     }
 
     dots++;
@@ -556,14 +586,12 @@ void PPU::execute()
         if (scanline > FRAME_END_SCANLINE)
         {
             scanline = -1;
-            screen.RENDER_ENABLED = true;
+            RENDER_ENABLED = true;
         }
     }
 }
 
-
-
-//HELPER FUNCTIONS 
+// HELPER FUNCTIONS
 byte flip_byte_fn(byte x)
 {
     byte aux = 0x00;
@@ -575,7 +603,7 @@ byte flip_byte_fn(byte x)
     return aux;
 }
 
-void PPU::generate_flip_byte_lt()
+void generate_flip_byte_lt()
 {
     for (int i = 0; i < 255; i++)
     {
@@ -583,7 +611,7 @@ void PPU::generate_flip_byte_lt()
     }
 }
 
-void PPU::clock_shifters()
+void clock_shifters()
 {
     if (mask.render_background)
     {
@@ -607,7 +635,7 @@ void PPU::clock_shifters()
     }
 }
 
-inline void PPU::load_bg_shifters()
+inline void load_bg_shifters()
 {
     bgs_pattern_l = (bgs_pattern_l & 0xFF00) | bg_next_tile_lsb;
     bgs_pattern_h = (bgs_pattern_h & 0xFF00) | bg_next_tile_msb;
@@ -615,7 +643,7 @@ inline void PPU::load_bg_shifters()
     bgs_attribute_h = (bgs_attribute_h & 0xFF00) | ((bg_next_tile_attrib & 0b10) ? 0xFF : 0x00);
 }
 
-inline void PPU::transfer_address_x()
+inline void transfer_address_x()
 {
     if (mask.render_background || mask.render_sprites)
     {
@@ -624,7 +652,7 @@ inline void PPU::transfer_address_x()
     }
 }
 
-inline void PPU::increment_scroll_x()
+inline void increment_scroll_x()
 {
     if (mask.render_background)
     {
@@ -638,7 +666,7 @@ inline void PPU::increment_scroll_x()
     }
 }
 
-inline void PPU::increment_scroll_y()
+inline void increment_scroll_y()
 {
     if (mask.render_background)
     {
@@ -662,7 +690,7 @@ inline void PPU::increment_scroll_y()
     }
 }
 
-inline void PPU::transfer_address_y()
+inline void transfer_address_y()
 {
     if (mask.render_background | mask.render_sprites)
     {
@@ -672,19 +700,19 @@ inline void PPU::transfer_address_y()
     }
 };
 
-inline void PPU::set_vblank()
+inline void set_vblank()
 {
     status.vertical_blank = 1;
 }
 
-inline void PPU::clear_vblank()
+inline void clear_vblank()
 {
     status.vertical_blank = 0;
 }
 
-inline void PPU::init_sprites_on_scanline()
+inline void init_sprites_on_scanline()
 {
-    uint32_t* pointer = (uint32_t *)sprites_on_scanline;
+    uint32_t *pointer = (uint32_t *)sprites_on_scanline;
     pointer[0] = 0xFFFFFFFF;
     pointer[1] = 0xFFFFFFFF;
     pointer[2] = 0xFFFFFFFF;
@@ -692,6 +720,6 @@ inline void PPU::init_sprites_on_scanline()
     pointer[4] = 0xFFFFFFFF;
     pointer[5] = 0xFFFFFFFF;
     pointer[6] = 0xFFFFFFFF;
-    pointer[7] = 0xFFFFFFFF; 
-    //std::memset(sprites_on_scanline, 0xFF, 8 * sizeof(_OAM));
+    pointer[7] = 0xFFFFFFFF;
+    // std::memset(sprites_on_scanline, 0xFF, 8 * sizeof(_OAM));
 }
