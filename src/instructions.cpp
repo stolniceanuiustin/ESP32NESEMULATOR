@@ -201,6 +201,8 @@ void LSR(uint16_t address, bool accumulator)
     }
     cycles += lookup[inst.bbb];
 }
+
+//todo : split this up into 2 functions
 void ROR(uint16_t address, bool accumulator)
 {
     // Rotate right
@@ -250,7 +252,7 @@ void LDX(uint16_t address, bool page_cross)
     set_ZN(X);
     cycles += lookup[inst.bbb] + (int)page_cross;
 }
-void DECC(uint16_t address)
+void IRAM_ATTR  DECC(uint16_t address)
 {
     int lookup[] = {-1, 5, -1, 6, -1, 6, -1, 7};
     byte operand = read(address);
@@ -259,7 +261,7 @@ void DECC(uint16_t address)
     set_ZN(operand);
     cycles += lookup[inst.bbb];
 }
-void INC(uint16_t address)
+void IRAM_ATTR  INC(uint16_t address)
 {
     int lookup[] = {-1, 5, -1, 6, -1, 6, -1, 7};
     byte operand = read(address);
@@ -270,7 +272,7 @@ void INC(uint16_t address)
 }
 
 
-void BITT(uint16_t address)
+void IRAM_ATTR  BITT(uint16_t address)
 {
     // bit test, test if one or more bits are in a target memory location
     // mask patern in A is & with memory to keep zero, overflow, negative etc.
@@ -294,13 +296,13 @@ void BITT(uint16_t address)
     cycles += lookup[inst.bbb];
 }
 
-void JMP_abs(uint16_t jump_address)
+void IRAM_ATTR  JMP_abs(uint16_t jump_address)
 {
     PC = jump_address;
     cycles += 3;
 }
 
-void JMP_indirect(uint16_t jump_address)
+void IRAM_ATTR  JMP_indirect(uint16_t jump_address)
 {
     // TODO: ADDRESS BUG FROM ORIGINAL 6502(not a bug in my code)
     //PC = read_abs_address(jump_address);
@@ -313,14 +315,14 @@ void JMP_indirect(uint16_t jump_address)
     cycles += 5;
 }
 
-void STY(uint16_t address)
+void IRAM_ATTR STY(uint16_t address)
 {
     int lookup[] = {-1, 3, -1, 4, -1, 4, -1, -1};
     cpu_write(address, Y);
     cycles += lookup[inst.bbb];
 }
 
-void LDY(uint16_t address, bool page_cross)
+void IRAM_ATTR LDY(uint16_t address, bool page_cross)
 { // immediate, zeropage, nothig, absolut,nothing, zero page x, nothing, absolut x
     int lookup[] = {2, 3, -1, 4, -1, 4, -1, 4};
     Y = read(address);
@@ -328,7 +330,7 @@ void LDY(uint16_t address, bool page_cross)
     set_ZN(Y);
 }
 
-void CPY(uint16_t address)
+void IRAM_ATTR  CPY(uint16_t address)
 {
     int lookup[] = {2, 3, -1, 4, -1, -1, -1, -1};
     byte operand = read(address);  
@@ -340,7 +342,7 @@ void CPY(uint16_t address)
     cycles += lookup[inst.bbb];
 }
 
-void CPX(uint16_t address)
+void IRAM_ATTR  CPX(uint16_t address)
 {
     //TODO FIX THIS THE SAME AS CPY
     int lookup[] = {2, 3, -1, 4, -1, -1, -1, -1};
@@ -385,14 +387,14 @@ void unpack_flags(byte flags)
     C = 1 & flags;
     return;
 }
-void PHP()
+void IRAM_ATTR PHP()
 {
     byte to_push = pack_flags();
     push(to_push);
     cycles += 3;
 }
 
-void PLP()
+void IRAM_ATTR PLP()
 {
     byte flags = pop();
     unpack_flags(flags);
@@ -401,85 +403,85 @@ void PLP()
 
 }
 
-void PHA()
+void IRAM_ATTR PHA()
 {
     push(A);
     cycles += 3;
 }
 
-void PLA()
+void IRAM_ATTR  PLA()
 {
     A = pop();
     set_ZN(A);
     cycles += 4;
 }
 
-void DEY()
+void IRAM_ATTR DEY()
 {
     Y = Y-1;
     set_ZN(Y);
     cycles += 2;
 }
 
-void TAY()
+void IRAM_ATTR TAY()
 {
     Y = A;
     set_ZN(Y);
     cycles += 2;
 }
 
-void INY()
+void IRAM_ATTR INY()
 {
     Y = Y+1;
     set_ZN(Y);
     cycles += 2;
 }
 
-void INX()
+void IRAM_ATTR INX()
 {
     X = X+1;
     set_ZN(X);
     cycles += 2;
 }
 
-void CLC()
+void IRAM_ATTR CLC()
 {
     C = 0;
     cycles += 2;
 }
 
-void SEC()
+void IRAM_ATTR SEC()
 {
     C = 1;
     cycles += 2;
 }
 
-void CLI()
+void IRAM_ATTR CLI()
 {
     I = 0;
     cycles += 2;
 }
 
-void SEI()
+void IRAM_ATTR SEI()
 {
     I = 1;
     cycles += 2;   
 }
 
-void TYA()
+void IRAM_ATTR TYA()
 {
     A = Y;
     set_ZN(A);
     cycles += 2;
 }
 
-void CLV()
+void IRAM_ATTR CLV()
 {
     O = 0;
     cycles += 2;   
 }
 
-void CLD()
+void IRAM_ATTR CLD()
 {
     //SHOULDNT USE IN NES EMU
     //std::cout << "CLD shouldn't be used\n";
@@ -487,40 +489,40 @@ void CLD()
     cycles += 2; 
 }
 
-void SED()
+void IRAM_ATTR SED()
 {
     D = 1;
     cycles += 2;
 }
 
-void TXA()
+void IRAM_ATTR  TXA()
 {
     A = X;
     set_ZN(A);
     cycles += 2;
 }
 
-void TXS()
+void IRAM_ATTR  TXS()
 {
     SP = X;
     cycles += 2;
 }
 
-void TAX()
+void IRAM_ATTR TAX()
 {
     X = A;
     set_ZN(X);
     cycles += 2;
 }
 
-void TSX()
+void IRAM_ATTR TSX()
 {
     X = SP;
     set_ZN(X);
     cycles += 2;
 }
 
-void DEX()
+void IRAM_ATTR DEX()
 {
     X = X-1;
     set_ZN(X);
@@ -530,19 +532,19 @@ void DEX()
 /*
 interrupts
 */
-void NOPP()
+void IRAM_ATTR NOPP()
 {
     cycles += 2;
 }
 
-void JSR_abs(uint16_t address)
+void IRAM_ATTR JSR_abs(uint16_t address)
 {
     push_address(PC);
     PC = address;
     cycles += 6;
 }
 
-void RTS()
+void IRAM_ATTR RTS()
 {
     uint16_t aux = pop_address();
     aux += 1;
@@ -550,7 +552,7 @@ void RTS()
     cycles += 6;
 }
 
-void BRK()
+void IRAM_ATTR BRK()
 {
     int t = 0;
     if(I == 0)
@@ -565,7 +567,7 @@ void BRK()
 }
 
 
-void trigger_irq()
+void IRAM_ATTR trigger_irq()
 {
     if(I == 0) //interrupts enabled
     {
@@ -580,7 +582,7 @@ void trigger_irq()
     }
 }
 
-void trigger_nmi()
+void IRAM_ATTR trigger_nmi()
 {   //STACK STARTS AT 0xFD
     //std::cout << "===============NMI TRIGGERED===============\n";
     SP = 0xFD;

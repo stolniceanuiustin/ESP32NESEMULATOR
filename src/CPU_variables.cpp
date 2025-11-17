@@ -2,7 +2,7 @@
 
 
 struct Instruction inst;
-CPU_STATE state = FETCH_INSTRUCTION;
+CPU_STATE DRAM_ATTR state = FETCH_INSTRUCTION;
 
 byte A = 0x00;
 byte X = 0x00;
@@ -11,9 +11,9 @@ uint16_t PC = 0x0000;
 byte SP = 0xFD; 
 
 
-uint64_t cycles = 0;
-int64_t estimated_cycles = 0;
-uint64_t elapsed_cycles = 0;
+uint32_t cycles = 0;
+int32_t estimated_cycles = 0;
+uint32_t elapsed_cycles = 0;
 
 
 byte C = 0; // carry

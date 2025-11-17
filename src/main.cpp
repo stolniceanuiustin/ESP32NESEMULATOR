@@ -38,7 +38,7 @@ void Core0Loop(void *parameter);
 uint8_t div3 = 0;
 bool dma_phase = false;
 
-inline void bus_clock_t()
+inline void IRAM_ATTR bus_clock_t()
 {
     ppu_execute(); // same as before
     if (++div3 == 3)
@@ -132,6 +132,10 @@ void loop()
     controller[0] = controller_input_buffer;
     if (RENDER_ENABLED)
     {
+        // for(int i=0; i<256*240; i++)
+        // {
+        //     pixels[i] = TFT_BLUE;
+        // }
         tft.pushImage(0, 0, 256, 240, pixels);
 
         // input
@@ -141,63 +145,48 @@ void loop()
 
         if (gamepad.buttonIsPressed("UP"))
             controller_input_buffer |= 0x08;
+
         if (gamepad.buttonIsPressed("DOWN"))
             controller_input_buffer |= 0x04;
+
         if (gamepad.buttonIsPressed("LEFT"))
             controller_input_buffer |= 0x02;
+
         if (gamepad.buttonIsPressed("RIGHT"))
             controller_input_buffer |= 0x01;
-        if (gamepad.buttonIsPressed("CROSS"))
-            controller_input_buffer |= 0x20; 
-        if (gamepad.buttonIsPressed("CIRCLE"))
-            controller_input_buffer |= 0x10; 
-        if (gamepad.buttonIsPressed("SELECT"))
-            controller_input_buffer |= 0x40; 
-        if (gamepad.buttonIsPressed("START"))
-            controller_input_buffer |= 0x80; 
-        Serial.println(controller_input_buffer);
+
+        if (gamepad.buttonIsPressed("START")) // SDLK_s  = 0x10
+            controller_input_buffer |= 0x10;
+
+        if (gamepad.buttonIsPressed("SELECT")) // SDLK_a  = 0x20
+            controller_input_buffer |= 0x20;
+
+        if (gamepad.buttonIsPressed("SQUARE")) // SDLK_z  = 0x40
+            controller_input_buffer |= 0x40;
+
+        if (gamepad.buttonIsPressed("CROSS")) // SDLK_x  = 0x80
+            controller_input_buffer |= 0x80;
 
         // Serial.println("Frame rendered");
         frames++;
         RENDER_ENABLED = false;
     }
-    // current_time_s = millis();
-    // if (current_time_s - previous_time_s >= 1000)
-    // {
-    //     previous_time_s = current_time_s;
-    //     Serial.println("FPS: " + String(frames));
-    //     frames = 0;
-    // }
-    // start_cycles_d = xthal_get_ccount();
-    // bus_clock_t(); // does one clock systemwide. debug logs disabled
-    // end_cycles_d = xthal_get_ccount();
-    // uint32_t my_cycles = end_cycles_d - start_cycles_d;
-    // float time_ns = (float)my_cycles * (1e9 / (float)CPU_FREQ_MHZ / 1e6);
-    // Serial.printf("Clock took %u cycles (~%.2f ns)\n", my_cycles, time_ns);
-    // delay(10);
-
-    // uint32_t cycles = end_time- start_time;
-    // float time_ns = (float)cycles * (1e9 / (float)CPU_FREQ_MHZ / 1e6);
-    // Serial.printf("Clock took %u cycles (~%.2f ns)\n", cycles, time_ns);
-    // delay(100);
-
-    // memset(frameBuffer, 0, sizeof(frameBuffer));
-    // tft.pushImage(0, 0, 256, 240, frameBuffer); // This is the method to push framebuffer to screen
 }
 
-void Core0Loop(void *parameter)
+void IRAM_ATTR Core0Loop(void *parameter)
 {
     for (;;)
     {
 
-        for (int i = 0; i <= 200000; i++)
+        for (int i = 0; i <= 900000; i++)
         {
-            // start_cycles_d = xthal_get_ccount();
+            //start_cycles_d = xthal_get_ccount();
             bus_clock_t(); // does one clock systemwide. debug logs disabled
-            // end_cycles_d = xthal_get_ccount();
+            end_cycles_d = xthal_get_ccount();
             // uint32_t my_cycles = end_cycles_d - start_cycles_d;
             // float time_ns = (float)my_cycles * (1e9 / (float)CPU_FREQ_MHZ / 1e6);
             // Serial.printf("Clock took %u cycles (~%.2f ns)\n", my_cycles, time_ns);
+            // delay(100);
         }
 
         // if (RENDER_ENABLED)
@@ -207,6 +196,6 @@ void Core0Loop(void *parameter)
         //     frames++;
         //     RENDER_ENABLED = false;
         // }
-        vTaskDelay(1);
+        vTaskDelay(1); //keep the watchdog happy!
     }
 }

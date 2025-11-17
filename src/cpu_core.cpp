@@ -43,7 +43,7 @@ void cpu_reset() {
 	state = FETCH_INSTRUCTION;
 }
 
-byte read_pc()
+byte IRAM_ATTR read_pc()
 {
     byte val = read(PC);
     PC++;
@@ -51,7 +51,7 @@ byte read_pc()
 }
 
 // stack opperatons. remember, addresses are 16 bit wide!
-void push(byte x)
+void IRAM_ATTR push(byte x)
 {
     // Stack overflow should handle itself
     cpu_write(0x0100 + SP, x);
@@ -66,13 +66,13 @@ void push_address(uint16_t address)
     SP--;
 }
 
-byte pop()
+byte IRAM_ATTR pop()
 {
     SP++;
     byte to_return = read(0x0100 + SP);
     return to_return;
 }
-uint16_t pop_address()
+uint16_t IRAM_ATTR pop_address()
 {
     byte low_byte = pop();
     byte high_byte = pop();
@@ -81,17 +81,8 @@ uint16_t pop_address()
     return to_return;
 }
 
-// TODO : DO NOT USE THIS
-void hexdump()
-{
-    // FILE *cpu_fullhexdump = fopen("cpuhexdumpfull", "wb");
-    for (int i = 0; i <= 0xFFFF; i++)
-    {
-        Serial.println("Address: " + String(i) + " Data: " + String(read(i), HEX));
-    }
-}
 
-uint16_t read_address(byte offset)
+uint16_t IRAM_ATTR read_address(byte offset)
 {
     uint16_t val = read(offset + 1); // little endian
     val <<= 8;
@@ -101,7 +92,7 @@ uint16_t read_address(byte offset)
 
 // The difference between read_address and read_abs_address is that
 // read_abs_address takes a 16bit offset(reads the absolute address)
-uint16_t read_abs_address(uint16_t offset)
+uint16_t IRAM_ATTR  read_abs_address(uint16_t offset)
 {
     uint16_t val = read(offset + 1); // little endian
     val <<= 8;
@@ -109,7 +100,7 @@ uint16_t read_abs_address(uint16_t offset)
     return val;
 }
 
-uint16_t read_address_from_pc()
+uint16_t IRAM_ATTR read_address_from_pc()
 {
     uint16_t address = read_abs_address(PC);
     PC += 2;
@@ -138,7 +129,7 @@ bool reset()
     return true;
 }
 
-void run_instruction_group1(uint16_t address, bool page_cross)
+void IRAM_ATTR run_instruction_group1(uint16_t address, bool page_cross)
 {
     switch (inst.aaa)
     {
@@ -169,7 +160,7 @@ void run_instruction_group1(uint16_t address, bool page_cross)
     }
 }
 
-void run_instruction_group2(uint16_t address, bool page_cross, bool accumulator)
+void IRAM_ATTR run_instruction_group2(uint16_t address, bool page_cross, bool accumulator)
 {
     switch (inst.aaa)
     {
@@ -201,7 +192,7 @@ void run_instruction_group2(uint16_t address, bool page_cross, bool accumulator)
     return;
 }
 
-void run_instruction_group3(uint16_t address, bool page_cross)
+void IRAM_ATTR run_instruction_group3(uint16_t address, bool page_cross)
 {
     uint16_t jump_address = 0;
     switch (inst.aaa)
@@ -236,7 +227,7 @@ void run_instruction_group3(uint16_t address, bool page_cross)
     return;
 }
 
-void run_instruction_group_sb1()
+void IRAM_ATTR run_instruction_group_sb1()
 {
     switch (inst.opcode)
     {
@@ -289,11 +280,11 @@ void run_instruction_group_sb1()
         SED();
         break;
     default:
-        std::cerr << "ILLEGAL";
+        break;
     }
 }
 
-void run_instruction_group_sb2()
+void IRAM_ATTR  run_instruction_group_sb2()
 {
     switch (inst.opcode)
     {
@@ -343,7 +334,7 @@ CPU_VARS pack_vars()
 // This function runes one opcode, not one cycle. My emulator does not aim to be
 // cycle accurate CPU EXECUTE NOW DOES ONLY ONE CLOCK
 
-void cpu_clock()
+void IRAM_ATTR cpu_clock()
 {
     if (state == FETCH_INSTRUCTION)
     {
@@ -373,7 +364,7 @@ void cpu_clock()
 
 
 // TODO: CHange this to be a boolean.
-void cpu_execute()
+void IRAM_ATTR cpu_execute()
 {
     CPU_VARS cpu_old_vars;
     if (pending_nmi == true)
@@ -501,7 +492,7 @@ void cpu_execute()
 }
 
 
-void fetch_instruction()
+void inline IRAM_ATTR fetch_instruction()
 {
     inst.opcode = read(PC);
     inst.aaa = (0xE0 & inst.opcode) >> 5;      // first 3 bits of the opcode
@@ -512,7 +503,7 @@ void fetch_instruction()
 }
 
 
-byte ram_at(uint16_t address)
+byte IRAM_ATTR ram_at(uint16_t address)
 {
     return cpu_read(address);
 }

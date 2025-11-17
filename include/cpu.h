@@ -36,10 +36,9 @@ extern byte X;
 extern byte Y;
 extern uint16_t PC;
 extern byte SP; // Stack pointer
-extern uint64_t cycles;
-extern int64_t estimated_cycles;
-extern uint64_t elapsed_cycles;
-
+extern uint32_t cycles;
+extern int32_t estimated_cycles;
+extern uint32_t elapsed_cycles;
 
 // Cpu Flags
 extern byte C; // carry

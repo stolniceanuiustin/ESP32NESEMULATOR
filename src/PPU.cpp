@@ -295,8 +295,8 @@ void ppu_write_from_cpu(byte addr, byte data)
         vaddr.reg += (control.increment_mode ? 32 : 1);
     }
 }
-
-void ppu_execute()
+\
+void IRAM_ATTR ppu_execute()
 {
     if (scanline >= -1 && scanline < 240)
     {

@@ -11,21 +11,21 @@ void screen_init()
     RENDER_ENABLED = false;
     generate_16bit_pallet();
 }
-
 void generate_16bit_pallet()
 {
     for (int i = 0; i < 64; i++)
     {
         uint32_t color = nes_pallete_32[i];
+
         uint8_t r = (color >> 24) & 0xFF;
         uint8_t g = (color >> 16) & 0xFF;
-        uint8_t b = (color >> 8) & 0xFF;
+        uint8_t b = (color >> 8)  & 0xFF;
 
-        // Convert 8-bit RGB to 5-6-5 format
-        uint16_t r5 = (r >> 3) & 0x1F;
-        uint16_t g6 = (g >> 2) & 0x3F;
-        uint16_t b5 = (b >> 3) & 0x1F;
 
-        nes_pallete_16[i] = (r5 << 11) | (g6 << 5) | b5;
+        uint16_t r5 = r >> 3;
+        uint16_t b6 = b >> 2;
+        uint16_t g5 = g >> 3;
+
+        nes_pallete_16[i] = (5 << 11) | (b6 << 5) | g5;
     }
 }
