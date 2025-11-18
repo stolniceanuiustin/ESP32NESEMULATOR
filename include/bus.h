@@ -4,9 +4,9 @@
 
 typedef uint8_t byte;
 
-extern uint64_t new_cycles;
-extern int64_t old_cycles;
-extern uint64_t cycles_elapsed;
+extern uint32_t new_cycles;
+extern int32_t old_cycles;
+extern uint32_t cycles_elapsed;
 
 extern byte controller[2];
 extern byte controller_state[2];

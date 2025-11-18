@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
+#include <esp_task_wdt.h>
 #include "ps2_driver.h"
-
+#include <esp_int_wdt.h>
+#include <esp_task_wdt.h>
 #include "bus.h"
 #include "cartridge.h"
 #include "cpu.h"
@@ -28,8 +30,8 @@ uint16_t frameBuffer[256 * 240]; // NES resolution
 byte controller_input_buffer = 0;
 
 TaskHandle_t Core0Task;
-int start_cycles_d = 0;
-int end_cycles_d = 0;
+uint32_t start_cycles_d = 0;
+uint32_t end_cycles_d = 0;
 
 Config configClass = Config("/smb.bin");
 uint32_t frames = 0;
@@ -38,9 +40,18 @@ void Core0Loop(void *parameter);
 uint8_t div3 = 0;
 bool dma_phase = false;
 
+/*
+Takes on average ~400 cycles / bus clock
+With only ppu it takes ~250 (some of it is function overhead) (before sprite rendering happens!)
+With sprite rendering it takes somewhere near 340 cycles
+So this is the thing to optimize!! 
+CPU is pretty efficient
+With only cpu it takes  60 cycles (so cpu is almost as optimized as it can be?)
+*/
+
 inline void IRAM_ATTR bus_clock_t()
 {
-    ppu_execute(); // same as before
+    ppu_execute(); 
     if (++div3 == 3)
     {
         div3 = 0;
@@ -111,7 +122,7 @@ void setup()
     cpu_reset();
     ppu_init();
     // PC = read_abs_address(0xFFFC);
-    int frames = 0;
+    uint32_t frames = 0;
 
     xTaskCreatePinnedToCore(Core0Loop, "Core0Loop", 10000, NULL, configMAX_PRIORITIES - 1, &Core0Task, 0);
 
@@ -166,7 +177,7 @@ void loop()
 
         if (gamepad.buttonIsPressed("CROSS")) // SDLK_x  = 0x80
             controller_input_buffer |= 0x80;
-
+        Serial.println(controller_input_buffer);
         // Serial.println("Frame rendered");
         frames++;
         RENDER_ENABLED = false;
@@ -175,19 +186,25 @@ void loop()
 
 void IRAM_ATTR Core0Loop(void *parameter)
 {
+    //esp_task_wdt_deinit(); // disable task WDT
     for (;;)
     {
-
-        for (int i = 0; i <= 900000; i++)
+        start_cycles_d = xthal_get_ccount();
+        for (int i = 0; i <= 1000000; i++)
         {
-            //start_cycles_d = xthal_get_ccount();
-            bus_clock_t(); // does one clock systemwide. debug logs disabled
-            end_cycles_d = xthal_get_ccount();
-            // uint32_t my_cycles = end_cycles_d - start_cycles_d;
-            // float time_ns = (float)my_cycles * (1e9 / (float)CPU_FREQ_MHZ / 1e6);
-            // Serial.printf("Clock took %u cycles (~%.2f ns)\n", my_cycles, time_ns);
-            // delay(100);
-        }
+        //{
+            
+        bus_clock_t(); 
+        // does one clock systemwide. debug logs disabled
+                       // end_cycles_d = xthal_get_ccount();
+        
+                    }
+        end_cycles_d = xthal_get_ccount();
+       uint32_t my_cycles = end_cycles_d - start_cycles_d;
+        // // //float time_ns = (float)my_cycles * (1e9 / (float)CPU_FREQ_MHZ / 1e6);
+       Serial.printf("Clock took %u cycles, on average %u per cycle\n", my_cycles, my_cycles/1000000);
+
+        // delay(100);
 
         // if (RENDER_ENABLED)
         // {
@@ -196,6 +213,6 @@ void IRAM_ATTR Core0Loop(void *parameter)
         //     frames++;
         //     RENDER_ENABLED = false;
         // }
-        vTaskDelay(1); //keep the watchdog happy!
+        vTaskDelay(1); // keep the watchdog happy!
     }
 }

@@ -394,24 +394,31 @@ void IRAM_ATTR cpu_execute()
         byte high_nibble = inst.opcode >> 4;
         uint16_t address = 0;
 
-        // Some unofficial opcodes(not all yet)
-        if (inst.opcode == 0x04 || inst.opcode == 0x44 || inst.opcode == 0x64)
+        // // Some unofficial opcodes(not all yet)
+        // if (inst.opcode == 0x04 || inst.opcode == 0x44 || inst.opcode == 0x64)
+        // {
+        //     PC += 1;
+        //     cycles += 3;
+        // }
+        // else if (inst.opcode == 0x0C)
+        // {
+        //     PC += 2;
+        //     cycles += 4;
+        // }
+        // else if (inst.opcode == 0x14 || inst.opcode == 0x34 || inst.opcode == 0x54 ||
+        //          inst.opcode == 0x74 || inst.opcode == 0xD4 || inst.opcode == 0xF4)
+        // {
+        //     PC += 1;
+        //     cycles += 4;
+        // }
+        if (low_nibble == 0x08)
         {
-            PC += 1;
-            cycles += 3;
+            run_instruction_group_sb1();
         }
-        else if (inst.opcode == 0x0C)
+        else if (low_nibble == 0x0A && high_nibble >= 0x08)
         {
-            PC += 2;
-            cycles += 4;
+            run_instruction_group_sb2();
         }
-        else if (inst.opcode == 0x14 || inst.opcode == 0x34 || inst.opcode == 0x54 ||
-                 inst.opcode == 0x74 || inst.opcode == 0xD4 || inst.opcode == 0xF4)
-        {
-            PC += 1;
-            cycles += 4;
-        }
-
         else if (low_nibble == 0x00 && last_5_bits == 0b00010000)
         {
             // Branching instructions
@@ -454,14 +461,7 @@ void IRAM_ATTR cpu_execute()
             RTS(); // return from subroutine;
         }
         // for single byte instructions !
-        else if (low_nibble == 0x08)
-        {
-            run_instruction_group_sb1();
-        }
-        else if (low_nibble == 0x0A && high_nibble >= 0x08)
-        {
-            run_instruction_group_sb2();
-        }
+
         else
             switch (inst.cc)
             {

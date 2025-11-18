@@ -97,7 +97,7 @@ extern uint16_t w;
 // Togles on each write to PPUSCROLL or PPUADDR, indicating whether it's the first or secnon dwrite. Clears on reads of PPUSTATUS
 // its also claled the write latch or write toggle
 
-extern int scanline;
+extern int16_t scanline;
 extern uint16_t dots;
 
 extern bool PPUSCROLL_latch;
@@ -112,6 +112,8 @@ extern byte PPU_BUFFER;
 extern bool even_frame;
 extern _OAM OAM[64];
 extern byte *pOAM; // pointer to OAM for byte by byte access
+
+extern byte tile_fetch_phase;
 // TODO: here you can enable/disable ppu logging
 void ppu_init();
 

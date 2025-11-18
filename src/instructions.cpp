@@ -16,36 +16,30 @@ ADDRESSED INSTRUCTIONS - THE HARDEST
 void ORA(uint16_t address, bool page_cross)
 {
     // OR between accumulator and the contents at the given address
-    const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
     A = A | read(address);
     set_ZN(A);
 
-    cycles += lookup[inst.bbb] + (int)page_cross;
 }
 
 void AND(uint16_t address, bool page_cross)
 {
-    const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
     byte operand = read(address);
     A = A & operand;
     set_ZN(A);
 
-    cycles += lookup[inst.bbb] + (int)page_cross;
+
 }
 
 void EOR(uint16_t address, bool page_cross)
 {
-    const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
     A = A ^ read(address);
     set_ZN(A);
 
-    cycles += lookup[inst.bbb] + (int)page_cross;
+    
 }
 
 void ADC(uint16_t address, bool page_cross)
 {
-    // TODO: TEST THIS
-    const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
     byte operand = read(address);
     uint16_t result = (uint16_t)A + (uint16_t)(operand) + (uint16_t)(C);
     C = result > 0x00FF ? 1 : 0; 
@@ -54,7 +48,6 @@ void ADC(uint16_t address, bool page_cross)
     A = (byte)(result & 0x00FF);
     set_ZN(A);
 
-    cycles += lookup[inst.bbb] + (int)page_cross;
 }
 
 void STA(uint16_t address)
@@ -62,36 +55,27 @@ void STA(uint16_t address)
     // Can't use IMEDIATE ADDRESSING
     // Stores the contents of the accumulator in memory
     // Doesnt change flags
-    const int lookup[] = {6, 3, -1, 4, 6, 4, 5, 5};
     cpu_write(address, A);
-    cycles += lookup[inst.bbb];
 }
 
 void LDA(uint16_t address, bool page_cross)
 {
     //Loads A from memory
-    const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
     A = read(address);
     set_ZN(A);
-    cycles += lookup[inst.bbb] + (int)page_cross;
 }
 
 void CMP(uint16_t address, bool page_cross)
 {
     //TODO not sure if the flags are set correctly but i think they are, will find out in unit testing
-    const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
-
     uint16_t result = A - read(address);
     //cpu->SR &= ~(CARRY | NEGATIVE | ZERO);
     C = !(result & 0xFF00) ? 1 : 0;
     set_ZN(result);
-    cycles += lookup[inst.bbb] + (int)page_cross;
 }
 
 void SBC(uint16_t address, bool page_cross)
 {
-    // TODO: TEST THIS
-    const int lookup[] = {6, 3, 2, 4, 5, 4, 4, 4};
     byte operand = read(address);
     operand = ~operand; 
     uint16_t result = (uint16_t)A + (uint16_t)(operand) + (uint16_t)(C);     //Accumulator + address + carry
@@ -102,7 +86,6 @@ void SBC(uint16_t address, bool page_cross)
     A = (byte)(result & 0x00FF);
     set_ZN(A);
 
-    cycles += lookup[inst.bbb] + (int)page_cross;
 }
 
 
@@ -111,7 +94,6 @@ void ASL(uint16_t address, bool accumulator)
     // Arithmetic shift left
     // Carry = old bit 7
     // bit 0 = 0
-    int lookup[] = {-1, 5, 2, 6, -1, 6, -1, 7};
     if (accumulator)
     {
         uint16_t carry_flag = A & (1 << 7);
@@ -134,12 +116,10 @@ void ASL(uint16_t address, bool accumulator)
         cpu_write(address, operand << 1);
         set_ZN(read(address));
     }
-    cycles += lookup[inst.bbb];
 }
 void ROL(uint16_t address, bool accumulator)
 {
     // rotate left
-    int lookup[] = {-1, 5, 2, 6, -1, 6, -1, 7};
     if (accumulator)
     {
         uint16_t carry_flag = A & (1 << 7);
@@ -168,12 +148,10 @@ void ROL(uint16_t address, bool accumulator)
             C = 0;
         set_ZN(operand);
     }
-    cycles += lookup[inst.bbb];
 }
 void LSR(uint16_t address, bool accumulator)
 {
     // Logical shift right
-    int lookup[] = {-1, 5, 2, 6, -1, 6, -1, 7};
     if (accumulator)
     {
         uint16_t carry_flag = A & 1;
@@ -199,14 +177,12 @@ void LSR(uint16_t address, bool accumulator)
             C = 0;
         set_ZN(operand);
     }
-    cycles += lookup[inst.bbb];
 }
 
 //todo : split this up into 2 functions
 void ROR(uint16_t address, bool accumulator)
 {
     // Rotate right
-    int lookup[] = {-1, 5, 2, 6, -1, 6, -1, 7};
     if (accumulator)
     {
         int carry_flag = A & 1;
@@ -236,39 +212,29 @@ void ROR(uint16_t address, bool accumulator)
             C = 0;
         set_ZN(operand);
     }
-
-    cycles += lookup[inst.bbb];
 }
 void STX(uint16_t address)
 {
-    int lookup[] = {-1, 3, -1, 4, -1, 4, -1, -1};
     cpu_write(address, X);
-    cycles += lookup[inst.bbb];
 }
 void LDX(uint16_t address, bool page_cross)
 {
-    int lookup[] = {2, 3, -1, 4, -1, 4, -1, 4};
     X = read(address);
     set_ZN(X);
-    cycles += lookup[inst.bbb] + (int)page_cross;
 }
 void IRAM_ATTR  DECC(uint16_t address)
 {
-    int lookup[] = {-1, 5, -1, 6, -1, 6, -1, 7};
     byte operand = read(address);
     operand -= 1;
     cpu_write(address, operand);
     set_ZN(operand);
-    cycles += lookup[inst.bbb];
 }
 void IRAM_ATTR  INC(uint16_t address)
 {
-    int lookup[] = {-1, 5, -1, 6, -1, 6, -1, 7};
     byte operand = read(address);
     operand += 1;
     cpu_write(address, operand);
     set_ZN(operand);
-    cycles += lookup[inst.bbb];
 }
 
 
@@ -276,7 +242,6 @@ void IRAM_ATTR  BITT(uint16_t address)
 {
     // bit test, test if one or more bits are in a target memory location
     // mask patern in A is & with memory to keep zero, overflow, negative etc.
-    int lookup[] = {-1, 3, -1, 4, -1, -1, -1, -1};
     uint8_t result = A & read(address);
     if (result == 0)
         Z = 1;
@@ -293,13 +258,12 @@ void IRAM_ATTR  BITT(uint16_t address)
     else
         O = 0;
 
-    cycles += lookup[inst.bbb];
+
 }
 
 void IRAM_ATTR  JMP_abs(uint16_t jump_address)
 {
     PC = jump_address;
-    cycles += 3;
 }
 
 void IRAM_ATTR  JMP_indirect(uint16_t jump_address)
@@ -312,47 +276,37 @@ void IRAM_ATTR  JMP_indirect(uint16_t jump_address)
     byte high_byte = read(((jump_address + 1) & 0x00FF) | high_byte_of_addr);
     aux_address = (high_byte << 8) | low_byte;
     PC = aux_address;
-    cycles += 5;
 }
 
 void IRAM_ATTR STY(uint16_t address)
 {
-    int lookup[] = {-1, 3, -1, 4, -1, 4, -1, -1};
     cpu_write(address, Y);
-    cycles += lookup[inst.bbb];
 }
 
 void IRAM_ATTR LDY(uint16_t address, bool page_cross)
 { // immediate, zeropage, nothig, absolut,nothing, zero page x, nothing, absolut x
-    int lookup[] = {2, 3, -1, 4, -1, 4, -1, 4};
     Y = read(address);
-    cycles += lookup[inst.bbb] + (int)page_cross;
     set_ZN(Y);
 }
 
 void IRAM_ATTR  CPY(uint16_t address)
 {
-    int lookup[] = {2, 3, -1, 4, -1, -1, -1, -1};
     byte operand = read(address);  
     byte result_byte = Y - operand;
     C = Y >= operand ? 1 : 0;
     set_ZN(result_byte);
     
-
-    cycles += lookup[inst.bbb];
 }
 
 void IRAM_ATTR  CPX(uint16_t address)
 {
-    //TODO FIX THIS THE SAME AS CPY
-    int lookup[] = {2, 3, -1, 4, -1, -1, -1, -1};
+
     byte operand = read(address);
     byte result_byte = X - operand;
     C = X >= operand ? 1 : 0;
     set_ZN(result_byte);
     
 
-    cycles += lookup[inst.bbb];
 }
 
 /*
@@ -391,7 +345,6 @@ void IRAM_ATTR PHP()
 {
     byte to_push = pack_flags();
     push(to_push);
-    cycles += 3;
 }
 
 void IRAM_ATTR PLP()
@@ -399,86 +352,79 @@ void IRAM_ATTR PLP()
     byte flags = pop();
     unpack_flags(flags);
 
-    cycles += 4;
 
 }
 
 void IRAM_ATTR PHA()
 {
     push(A);
-    cycles += 3;
 }
 
 void IRAM_ATTR  PLA()
 {
     A = pop();
     set_ZN(A);
-    cycles += 4;
 }
 
 void IRAM_ATTR DEY()
 {
     Y = Y-1;
     set_ZN(Y);
-    cycles += 2;
+    
 }
 
 void IRAM_ATTR TAY()
 {
     Y = A;
     set_ZN(Y);
-    cycles += 2;
+    
 }
 
 void IRAM_ATTR INY()
 {
     Y = Y+1;
     set_ZN(Y);
-    cycles += 2;
+    
 }
 
 void IRAM_ATTR INX()
 {
     X = X+1;
     set_ZN(X);
-    cycles += 2;
+    
 }
 
 void IRAM_ATTR CLC()
 {
     C = 0;
-    cycles += 2;
+    
 }
 
 void IRAM_ATTR SEC()
 {
     C = 1;
-    cycles += 2;
+    
 }
 
 void IRAM_ATTR CLI()
 {
     I = 0;
-    cycles += 2;
 }
 
 void IRAM_ATTR SEI()
 {
     I = 1;
-    cycles += 2;   
 }
 
 void IRAM_ATTR TYA()
 {
     A = Y;
     set_ZN(A);
-    cycles += 2;
 }
 
 void IRAM_ATTR CLV()
 {
     O = 0;
-    cycles += 2;   
 }
 
 void IRAM_ATTR CLD()
@@ -486,47 +432,45 @@ void IRAM_ATTR CLD()
     //SHOULDNT USE IN NES EMU
     //std::cout << "CLD shouldn't be used\n";
     D = 0;
-    cycles += 2; 
 }
 
 void IRAM_ATTR SED()
 {
     D = 1;
-    cycles += 2;
 }
 
 void IRAM_ATTR  TXA()
 {
     A = X;
     set_ZN(A);
-    cycles += 2;
+
 }
 
 void IRAM_ATTR  TXS()
 {
     SP = X;
-    cycles += 2;
+
 }
 
 void IRAM_ATTR TAX()
 {
     X = A;
     set_ZN(X);
-    cycles += 2;
+
 }
 
 void IRAM_ATTR TSX()
 {
     X = SP;
     set_ZN(X);
-    cycles += 2;
+
 }
 
 void IRAM_ATTR DEX()
 {
     X = X-1;
     set_ZN(X);
-    cycles += 2;
+
 }
 
 /*
@@ -541,7 +485,7 @@ void IRAM_ATTR JSR_abs(uint16_t address)
 {
     push_address(PC);
     PC = address;
-    cycles += 6;
+
 }
 
 void IRAM_ATTR RTS()
@@ -549,7 +493,7 @@ void IRAM_ATTR RTS()
     uint16_t aux = pop_address();
     aux += 1;
     PC = aux;
-    cycles += 6;
+
 }
 
 void IRAM_ATTR BRK()
@@ -591,7 +535,6 @@ void IRAM_ATTR trigger_nmi()
     PC = read_abs_address(NMI_vector);
     I = 1;
     //TODO check if this was an issue
-    cycles += 7;
     pending_nmi = false;
 }
 
@@ -600,5 +543,4 @@ void RTI()
     byte flags = pop();
     unpack_flags(flags);
     PC = pop_address();
-    cycles += 6;
 }
