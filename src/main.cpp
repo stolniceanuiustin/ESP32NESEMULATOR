@@ -49,6 +49,7 @@ CPU is pretty efficient
 With only cpu it takes  60 cycles (so cpu is almost as optimized as it can be?)
 */
 
+
 inline void IRAM_ATTR bus_clock_t()
 {
     ppu_execute(); 
@@ -191,32 +192,15 @@ void IRAM_ATTR Core0Loop(void *parameter)
     //esp_task_wdt_deinit(); // disable task WDT
     for (;;)
     {
-        
+        start_cycles_d = xthal_get_ccount();
         for (int i = 0; i <= 1000000; i++)
         {
-        // //{
-            start_cycles_d = xthal_get_ccount();
-        bus_clock_t(); 
-        // does one clock systemwide. debug logs disabled
-                       // end_cycles_d = xthal_get_ccount();
-        end_cycles_d = xthal_get_ccount();
-          uint32_t my_cycles = end_cycles_d - start_cycles_d;
-    //     // // //float time_ns = (float)my_cycles * (1e9 / (float)CPU_FREQ_MHZ / 1e6);
-        Serial.printf("Clock took %u cycles, on average %u per cycle\n", my_cycles, my_cycles/1000000);
-        delay(100);
+        bus_clock_t();           
         }
-        
-      
+        end_cycles_d = xthal_get_ccount();
+        uint32_t my_cycles = end_cycles_d - start_cycles_d;
+        Serial.printf("On average %u ESP cycles/NES cycle\n", my_cycles/1000000);
 
-        // delay(100);
-
-        // if (RENDER_ENABLED)
-        // {
-        //     // tft.pushImage(0, 0, 256, 240, pixels);
-        //     // Serial.println("Frame rendered");
-        //     frames++;
-        //     RENDER_ENABLED = false;
-        // }
         vTaskDelay(1); // keep the watchdog happy!
     }
 }

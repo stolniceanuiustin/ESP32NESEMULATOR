@@ -13,7 +13,7 @@ void inline clear_status_register(byte &x)
 {
     x &= 0b00011111;
 }
-byte transparent_pixel_color;
+
 void ppu_init()
 {
     current_frame = 0;
@@ -254,7 +254,7 @@ void IRAM_ATTR ppu_write_from_cpu(byte addr, byte data)
     }
 }
 
-loopy build_background_scanline(int scanline_index, loopy vaddr_snapshot, byte fine_x_snapshot)
+loopy IRAM_ATTR build_background_scanline(int scanline_index, loopy vaddr_snapshot, byte fine_x_snapshot)
 {
     if (!tile_cache_initialized)
         build_tile_cache();
@@ -324,6 +324,8 @@ loopy build_background_scanline(int scanline_index, loopy vaddr_snapshot, byte f
     return vaddr_next;
 }
 
+uint32_t start_cycles;
+uint32_t end_cycles;
 void IRAM_ATTR ppu_execute()
 {
     if (scanline == -1)
@@ -344,9 +346,10 @@ void IRAM_ATTR ppu_execute()
             transfer_address_x();
             vaddr = build_background_scanline(scanline, vaddr, fine_x);
         }
-
+    
         if (dots == 256)
         {
+            //start_cycles = xthal_get_ccount();
             // SPRITE EVALUATION
             sprite_cnt = 0;
             sprite_zero_on_scanline = false;
@@ -506,6 +509,8 @@ void IRAM_ATTR ppu_execute()
                 screen_set_pixel(scanline, x, color);
             }
             increment_scroll_y();
+            // end_cycles = xthal_get_ccount();
+            // Serial.printf("Scanline rendering took %d cycles!", end_cycles - start_cycles);
         }
     }
     if(scanline == 241 && dots == 1){

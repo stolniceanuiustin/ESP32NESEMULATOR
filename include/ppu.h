@@ -99,7 +99,7 @@ extern uint16_t w;
 
 extern int16_t scanline;
 extern uint16_t dots;
-
+extern byte transparent_pixel_color;
 extern bool PPUSCROLL_latch;
 extern bool PPUADDR_latch;
 extern bool first_write;
@@ -185,7 +185,7 @@ inline void transfer_address_y();
 
 // void memset_loop_unrolled(); //This is specifically for PPU
 void init_sprites_on_scanline();
-
+loopy build_background_scanline(int scanline_index, loopy vaddr_snapshot, byte fine_x_snapshot);
 enum State
 {
     PRE_RENDER,

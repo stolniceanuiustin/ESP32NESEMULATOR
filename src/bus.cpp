@@ -31,7 +31,7 @@ void bus_reset()
 // }
 void bus_clock()
 {
-    //ppu_execute();
+    ppu_execute();
     if (global_clock % 3 == 0)
     {
         if (dma_transfer == true)
