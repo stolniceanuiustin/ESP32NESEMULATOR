@@ -6,8 +6,8 @@ The CPU emulation is cycle accurate, while the PPU renders everything on a scanl
 
 ## Implemented MAPPERS:
 Unfortunetly, the only mapper implemented for now is MAPPER0, and it is hardcoded, as i tried to eliminate as much C++ overhead as possbile.  
-After i get this to run at full speed, i will implement other popular mappers.  
-
+After i get this to run at full speed, i will implement other popular mappers.    
+So working games include, but are not limited to Super Mario Bros. 1 and Donkey Kong.  
 ## Prerequisites:
 *ESP-IDF or Arduino IDE (I am using PlatformIO IDE)  
 *TFT-SPI LIBRARY  
