@@ -125,7 +125,7 @@ extern byte PPUSCROLL;
 extern byte nametable[2][0x0400]; // mirrored
 extern byte patterntable[2][0x1000];
 extern byte pallete_table[32];
-extern byte fine_x; // 3 bits wide!
+extern byte fine_x; // 3 bits wide! ONLY 3 BIT WIDE
 // rendering shift registers! they shift every PPU clock. There are 2 16bit registers
 // https://www.nesdev.org/wiki/PPU_rendering
 // Conceptually:
@@ -160,7 +160,7 @@ byte get_status();
 byte get_control();
 // For main bus
 
-byte ppu_read_from_cpu(byte addr, bool read_only);
+byte ppu_read_from_cpu(byte addr);
 void ppu_write_from_cpu(byte addr, byte data);
 // for internal ppu bus
 
@@ -172,7 +172,11 @@ void hexdump();
 // PPU Helper functions and variables
 extern byte flip_byte[256];
 void generate_flip_byte_lt();
+void build_tile_cache();
+
+
 void clock_shifters();
+
 inline void load_bg_shifters();
 inline void transfer_address_x();
 inline void increment_scroll_x();
@@ -192,4 +196,10 @@ enum State
 extern State pipeline_state;
 extern int cycle;
 
+
+//Optimizations 
+extern byte scanline_buffer[256];
+extern byte tile_pixels[512][8][8]; //Decode CHR tiles in advance - for Mapper0 games this never changes
+extern bool tile_cache_initialized;
+byte ppu_read_nametable_tile(byte nt_x, byte nt_y, byte coarse_x, byte coarse_y);
 #endif

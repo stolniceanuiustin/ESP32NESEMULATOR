@@ -91,37 +91,37 @@ inline void set_ZN(byte value)
     N = (value & 0x80) ? 1 : 0; //Checks bit 7 if it's set or not
 }
 uint16_t compute_addr_mode_g1(bool &page_cross);
-void run_instruction_group1(uint16_t address, bool page_cross);
-void ORA(uint16_t address, bool page_cross);
-void AND(uint16_t address, bool page_cross);
-void EOR(uint16_t address, bool page_cross);
-void ADC(uint16_t address, bool page_cross);
+void run_instruction_group1(uint16_t address);
+void ORA(uint16_t address);
+void AND(uint16_t address);
+void EOR(uint16_t address);
+void ADC(uint16_t address);
 void STA(uint16_t address);
-void LDA(uint16_t address, bool page_cross);
-void CMP(uint16_t address, bool page_cross);
-void SBC(uint16_t address, bool page_cross);
+void LDA(uint16_t address);
+void CMP(uint16_t address);
+void SBC(uint16_t address);
 
 // Second group of instructions
 bool compute_addr_mode_g23(bool &page_cross, uint16_t &address_to_return);
-void run_instruction_group2(uint16_t address, bool page_cross, bool accumulator);
+void run_instruction_group2(uint16_t address, bool accumulator);
 void ASL(uint16_t address, bool accumulator);
 void ROL(uint16_t address, bool accumulator);
 void LSR(uint16_t address, bool accumulator);
 void ROR(uint16_t address, bool accumulator);
 void STX(uint16_t address);
-void LDX(uint16_t address, bool page_cross);
+void LDX(uint16_t address);
 void DECC(uint16_t address); // dec is defined as 10 somewhere?
 void INC(uint16_t address);
 
 // Third group of instructions
-void run_instruction_group3(uint16_t address, bool page_cross);
+void run_instruction_group3(uint16_t addresss);
 void JMP_abs(uint16_t jump_address);
 void JMP_indirect(uint16_t jump_address);
 void BITT(uint16_t address);
 void STY(uint16_t address);
 void CPY(uint16_t address);
 void CPX(uint16_t address);
-void LDY(uint16_t address, bool page_cross);
+void LDY(uint16_t address);
 
 // SINGLE BYTE INSTRUCTIONS
 void run_instruction_group_sb1();

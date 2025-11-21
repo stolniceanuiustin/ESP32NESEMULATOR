@@ -13,7 +13,7 @@ ADDRESSED INSTRUCTIONS - THE HARDEST
 
 
 // GROUP 1 INSTRUCTIOS
-void ORA(uint16_t address, bool page_cross)
+void ORA(uint16_t address)
 {
     // OR between accumulator and the contents at the given address
     A = A | read(address);
@@ -21,7 +21,7 @@ void ORA(uint16_t address, bool page_cross)
 
 }
 
-void AND(uint16_t address, bool page_cross)
+void AND(uint16_t address)
 {
     byte operand = read(address);
     A = A & operand;
@@ -30,7 +30,7 @@ void AND(uint16_t address, bool page_cross)
 
 }
 
-void EOR(uint16_t address, bool page_cross)
+void EOR(uint16_t address)
 {
     A = A ^ read(address);
     set_ZN(A);
@@ -38,7 +38,7 @@ void EOR(uint16_t address, bool page_cross)
     
 }
 
-void ADC(uint16_t address, bool page_cross)
+void ADC(uint16_t address)
 {
     byte operand = read(address);
     uint16_t result = (uint16_t)A + (uint16_t)(operand) + (uint16_t)(C);
@@ -58,14 +58,14 @@ void STA(uint16_t address)
     cpu_write(address, A);
 }
 
-void LDA(uint16_t address, bool page_cross)
+void LDA(uint16_t address)
 {
     //Loads A from memory
     A = read(address);
     set_ZN(A);
 }
 
-void CMP(uint16_t address, bool page_cross)
+void CMP(uint16_t address)
 {
     //TODO not sure if the flags are set correctly but i think they are, will find out in unit testing
     uint16_t result = A - read(address);
@@ -74,7 +74,7 @@ void CMP(uint16_t address, bool page_cross)
     set_ZN(result);
 }
 
-void SBC(uint16_t address, bool page_cross)
+void SBC(uint16_t address)
 {
     byte operand = read(address);
     operand = ~operand; 
@@ -217,7 +217,7 @@ void STX(uint16_t address)
 {
     cpu_write(address, X);
 }
-void LDX(uint16_t address, bool page_cross)
+void LDX(uint16_t address)
 {
     X = read(address);
     set_ZN(X);
@@ -283,7 +283,7 @@ void IRAM_ATTR STY(uint16_t address)
     cpu_write(address, Y);
 }
 
-void IRAM_ATTR LDY(uint16_t address, bool page_cross)
+void IRAM_ATTR LDY(uint16_t address)
 { // immediate, zeropage, nothig, absolut,nothing, zero page x, nothing, absolut x
     Y = read(address);
     set_ZN(Y);

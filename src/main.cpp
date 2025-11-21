@@ -177,7 +177,9 @@ void loop()
 
         if (gamepad.buttonIsPressed("CROSS")) // SDLK_x  = 0x80
             controller_input_buffer |= 0x80;
-        Serial.println(controller_input_buffer);
+        
+        //=====IF CONTROLLER NOT WORKING ,UNCOMMENT THIS AND SEE INPUT_BUFFER IN REAL TIME!
+            //Serial.println(controller_input_buffer);
         // Serial.println("Frame rendered");
         frames++;
         RENDER_ENABLED = false;
@@ -189,20 +191,22 @@ void IRAM_ATTR Core0Loop(void *parameter)
     //esp_task_wdt_deinit(); // disable task WDT
     for (;;)
     {
-        start_cycles_d = xthal_get_ccount();
+        
         for (int i = 0; i <= 1000000; i++)
         {
-        //{
-            
+        // //{
+            start_cycles_d = xthal_get_ccount();
         bus_clock_t(); 
         // does one clock systemwide. debug logs disabled
                        // end_cycles_d = xthal_get_ccount();
-        
-                    }
         end_cycles_d = xthal_get_ccount();
-       uint32_t my_cycles = end_cycles_d - start_cycles_d;
-        // // //float time_ns = (float)my_cycles * (1e9 / (float)CPU_FREQ_MHZ / 1e6);
-       Serial.printf("Clock took %u cycles, on average %u per cycle\n", my_cycles, my_cycles/1000000);
+          uint32_t my_cycles = end_cycles_d - start_cycles_d;
+    //     // // //float time_ns = (float)my_cycles * (1e9 / (float)CPU_FREQ_MHZ / 1e6);
+        Serial.printf("Clock took %u cycles, on average %u per cycle\n", my_cycles, my_cycles/1000000);
+        delay(100);
+        }
+        
+      
 
         // delay(100);
 

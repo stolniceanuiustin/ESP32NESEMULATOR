@@ -129,38 +129,38 @@ bool reset()
     return true;
 }
 
-void IRAM_ATTR run_instruction_group1(uint16_t address, bool page_cross)
+void IRAM_ATTR run_instruction_group1(uint16_t address)
 {
     switch (inst.aaa)
     {
     case 0x0:
-        ORA(address, page_cross);
+        ORA(address);
         break;
     case 0x1:
-        AND(address, page_cross);
+        AND(address);
         break;
     case 0x2:
-        EOR(address, page_cross);
+        EOR(address);
         break;
     case 0x3:
-        ADC(address, page_cross);
+        ADC(address);
         break;
     case 0x4:
         STA(address);
         break;
     case 0x5:
-        LDA(address, page_cross);
+        LDA(address);
         break;
     case 0x6:
-        CMP(address, page_cross);
+        CMP(address);
         break;
     case 0x7:
-        SBC(address, page_cross);
+        SBC(address);
         break;
     }
 }
 
-void IRAM_ATTR run_instruction_group2(uint16_t address, bool page_cross, bool accumulator)
+void IRAM_ATTR run_instruction_group2(uint16_t address, bool accumulator)
 {
     switch (inst.aaa)
     {
@@ -180,7 +180,7 @@ void IRAM_ATTR run_instruction_group2(uint16_t address, bool page_cross, bool ac
         STX(address);
         break;
     case 0x5:
-        LDX(address, page_cross);
+        LDX(address);
         break;
     case 0x6:
         DECC(address);
@@ -192,7 +192,7 @@ void IRAM_ATTR run_instruction_group2(uint16_t address, bool page_cross, bool ac
     return;
 }
 
-void IRAM_ATTR run_instruction_group3(uint16_t address, bool page_cross)
+void IRAM_ATTR run_instruction_group3(uint16_t address)
 {
     uint16_t jump_address = 0;
     switch (inst.aaa)
@@ -215,7 +215,7 @@ void IRAM_ATTR run_instruction_group3(uint16_t address, bool page_cross)
         STY(address);
         break;
     case 0x5:
-        LDY(address, page_cross);
+        LDY(address);
         break;
     case 0x6:
         CPY(address);
@@ -439,7 +439,7 @@ void IRAM_ATTR cpu_execute()
                 PC += branch_position;
                 page_cross = (aux_pc & 0xFF00) != (PC & 0xFF00);
             }
-            cycles += 2 + (int)branch_succeded + 2 * (int)page_cross;
+            // cycles += 2 + (int)branch_succeded + 2 * (int)page_cross;
         }
 
         else if (inst.opcode == 0x00)
@@ -468,22 +468,22 @@ void IRAM_ATTR cpu_execute()
             // compute_addr_mode DOES return an address via reffrence(&)
             case 0x01: // cc = 1
                 address = compute_addr_mode_g1(page_cross);
-                run_instruction_group1(address, page_cross);
+                run_instruction_group1(address);
                 break;
             case 0x02: // cc = 10
                 // Will return address via pointer, the function returns a
                 // boolean.
                 onaddress_group2 = compute_addr_mode_g23(page_cross, address);
                 if (onaddress_group2 == true)
-                    run_instruction_group2(address, page_cross,
+                    run_instruction_group2(address,
                                            0); // Not accumulator, on address
                 else
-                    run_instruction_group2(null_address, page_cross,
+                    run_instruction_group2(null_address,
                                            1); // On accumulator
                 break;
             case 0x0: // cc = 00
                 compute_addr_mode_g23(page_cross, address);
-                run_instruction_group3(address, page_cross);
+                run_instruction_group3(address);
                 break;
             }
         return;
