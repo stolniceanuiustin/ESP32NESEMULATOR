@@ -13,6 +13,7 @@ After i get this to run at full speed, i will implement other popular mappers.
 *TFT-SPI LIBRARY  
 *A compatible ESP32 development board(I use ESP32s3)  
 *A display(I use a cheap chinese TFT display). The resolution must be at least 256x240
-
+*A NES ROM(For obvious reasons, i can't provide one, but i am sure you can find one!)
+*LittleFS to upload the ROMs to your development board
 ##
  
