@@ -151,6 +151,7 @@ extern byte sp_pattern_h[8];
 extern bool sprite_zero_on_scanline;
 extern bool sprite_zero_is_rendering;
 void ppu_reset();
+void ppu_render_scanline();
 void ppu_execute();
 void set_vblank_nmi();
 void clear_vblank_nmi();

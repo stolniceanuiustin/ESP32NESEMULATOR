@@ -44,19 +44,17 @@ bool dma_phase = false;
 Takes on average ~400 cycles / bus clock
 With only ppu it takes ~250 (some of it is function overhead) (before sprite rendering happens!)
 With sprite rendering it takes somewhere near 340 cycles
-So this is the thing to optimize!! 
+So this is the thing to optimize!!
 CPU is pretty efficient
 With only cpu it takes  60 cycles (so cpu is almost as optimized as it can be?)
 */
 
-
-inline void IRAM_ATTR bus_clock_t()
+//Rendering scanline then running the cpu works as most interaction between CPU and PPU happens during vblank, when the PPU is doing nothing
+inline void bus_clock_t()
 {
-    ppu_execute(); 
-    if (++div3 == 3)
+    ppu_render_scanline(); 
+    for (int i = 0; i < 114; i++)
     {
-        div3 = 0;
-
         if (!dma_transfer)
         {
             cpu_clock();
@@ -178,9 +176,9 @@ void loop()
 
         if (gamepad.buttonIsPressed("CROSS")) // SDLK_x  = 0x80
             controller_input_buffer |= 0x80;
-        
+
         //=====IF CONTROLLER NOT WORKING ,UNCOMMENT THIS AND SEE INPUT_BUFFER IN REAL TIME!
-            //Serial.println(controller_input_buffer);
+        // Serial.println(controller_input_buffer);
         // Serial.println("Frame rendered");
         frames++;
         RENDER_ENABLED = false;
@@ -189,17 +187,17 @@ void loop()
 
 void IRAM_ATTR Core0Loop(void *parameter)
 {
-    //esp_task_wdt_deinit(); // disable task WDT
+    // esp_task_wdt_deinit(); // disable task WDT
     for (;;)
     {
         start_cycles_d = xthal_get_ccount();
-        for (int i = 0; i <= 1000000; i++)
+        for (int i = 0; i <= 10000; i++)
         {
-        bus_clock_t();           
+            bus_clock_t();
         }
         end_cycles_d = xthal_get_ccount();
         uint32_t my_cycles = end_cycles_d - start_cycles_d;
-        Serial.printf("On average %u ESP cycles/NES cycle\n", my_cycles/1000000);
+        Serial.printf("On average %u ESP cycles/NES cycle\n", my_cycles / 100000);
 
         vTaskDelay(1); // keep the watchdog happy!
     }

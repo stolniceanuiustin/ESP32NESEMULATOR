@@ -326,6 +326,208 @@ loopy IRAM_ATTR build_background_scanline(int scanline_index, loopy vaddr_snapsh
 
 uint32_t start_cycles;
 uint32_t end_cycles;
+
+void IRAM_ATTR ppu_render_scanline()
+{
+    if (scanline == -1)
+    {
+        clear_vblank();
+        status.sprite_overflow = 0;
+        status.sprite_zero_hit = 0;
+        std::memset(sp_pattern_h, 0, 8);
+        std::memset(sp_pattern_l, 0, 8);
+    }
+    else if (scanline >= 0 && scanline < 240)
+    {
+        // ON real hardware this is done at dot 257 but we do it at the beginning
+        transfer_address_x();
+        vaddr = build_background_scanline(scanline, vaddr, fine_x);
+
+        // start_cycles = xthal_get_ccount();
+        //  SPRITE EVALUATION
+        sprite_cnt = 0;
+        sprite_zero_on_scanline = false;
+        std::memset(sprites_on_scanline, 0xFF, 8 * sizeof(_OAM));
+        std::memset(sp_pattern_l, 0, 8);
+        std::memset(sp_pattern_h, 0, 8);
+
+        uint32_t i = 0;
+        while (i < 64)
+        {
+            int16_t diff = scanline - (int16_t)OAM[i].y;
+            uint32_t sprite_height = control.sprite_size ? 16 : 8;
+
+            if (diff >= 0 && diff < (int)sprite_height)
+            {
+                if (sprite_cnt < 8)
+                {
+                    if (i == 0)
+                        sprite_zero_on_scanline = true;
+                    memcpy(&sprites_on_scanline[sprite_cnt], &OAM[i], sizeof(_OAM));
+                    sprite_cnt++;
+                }
+                else
+                {
+                    status.sprite_overflow = 1;
+                    break;
+                }
+            }
+            i++;
+        }
+
+        //===DATA FETCHING=== (get the sprites from memory based on what we done before)
+        for (int i = 0; i < sprite_cnt; i++)
+        {
+            uint16_t addr_l = 0;
+            byte attr = sprites_on_scanline[i].attributes;
+            int diff_y = scanline - sprites_on_scanline[i].y;
+
+            // this handles vertical flip
+            if (attr & 0x80)
+                diff_y = (control.sprite_size ? 15 : 7) - diff_y;
+            if (!control.sprite_size) // 8x8 mode
+            {
+                addr_l = (control.pattern_sprite << 12) | (sprites_on_scanline[i].id << 4) | diff_y;
+            }
+            else
+            {
+                // maybe spliting these into multiple variables will make it easier for the
+                // compiler to optimize(fingers crossed!)
+                byte bank = sprites_on_scanline[i].id & 0x01;
+                byte tile = sprites_on_scanline[i].id & 0xFE;
+                if (diff_y >= 8)
+                {
+                    diff_y -= 8;
+                    tile++;
+                }
+                addr_l = (bank << 12) | (tile << 4) | diff_y;
+            }
+            byte p_l = ppu_read(addr_l);
+            byte p_h = ppu_read(addr_l + 8);
+            if (attr & 0x40)
+            {
+                p_l = flip_byte[p_l];
+                p_h = flip_byte[p_h];
+            }
+            sp_pattern_l[i] = p_l;
+            sp_pattern_h[i] = p_h;
+        }
+
+        for (int x = 0; x < 256; x++)
+        {
+            byte bg_pixel = 0x00;
+            byte bg_pallete = 0x00;
+            if (mask.render_background)
+            {
+                if (mask.render_background_left || x >= 8)
+                {
+                    byte combined = scanline_buffer[x];
+                    bg_pixel = combined & 0x03;
+                    bg_pallete = combined >> 2;
+                }
+            }
+
+            // Foreground logic(sprites)
+            byte fg_pixel = 0;
+            byte fg_pallete = 0;
+            byte fg_priority = 0;
+            bool sprite_zero_is_rendering = false;
+            if (mask.render_sprites)
+            {
+                if (mask.render_sprites_left || x >= 8)
+                {
+                    for (int i = 0; i < sprite_cnt; i++)
+                    {
+                        int sx = sprites_on_scanline[i].x;
+                        if (x >= sx && x < sx + 8)
+                        {
+                            int diff_x = x - sx;
+
+                            int bit = 7 - diff_x;
+
+                            byte pixel_bit = ((sp_pattern_h[i] >> bit) & 1) << 1 | ((sp_pattern_l[i] >> bit) & 1);
+
+                            if (pixel_bit != 0)
+                            {
+                                fg_pixel = pixel_bit;
+                                fg_pallete = (sprites_on_scanline[i].attributes & 0x03) + 0x04;
+                                fg_priority = (sprites_on_scanline[i].attributes & 0x20) >> 5;
+
+                                if (i == 0 && sprite_zero_on_scanline)
+                                    sprite_zero_is_rendering = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            byte pixel = 0;
+            byte pallete = 0;
+            if (fg_pixel == 0)
+            {
+                pixel = bg_pixel;
+                pallete = bg_pallete;
+            }
+            else if (bg_pixel == 0)
+            {
+                pixel = fg_pixel;
+                pallete = fg_pallete;
+            }
+            else
+            {
+                if (fg_priority == 0)
+                {
+                    pixel = fg_pixel;
+                    pallete = fg_pallete;
+                }
+                else
+                {
+                    pixel = bg_pixel;
+                    pallete = bg_pallete;
+                }
+                if (!status.sprite_zero_hit && sprite_zero_on_scanline && sprite_zero_is_rendering)
+                {
+                    if (mask.render_background && mask.render_sprites)
+                    {
+                        status.sprite_zero_hit = 1;
+                    }
+                }
+            }
+
+            byte color = 0;
+            if (pixel != 0)
+            {
+                color = ppu_read(0x3F00 + (pallete << 2) + pixel) & 0x3F;
+            }
+            else
+                color = transparent_pixel_color;
+            screen_set_pixel(scanline, x, color);
+        }
+        increment_scroll_y();
+        // end_cycles = xthal_get_ccount();
+        // Serial.printf("Scanline rendering took %d cycles!", end_cycles - start_cycles);
+    }
+    else if (scanline == 240)
+    {
+        // this does nothing
+    }
+    else if (scanline == 241)
+    {
+        set_vblank();
+        transparent_pixel_color = ppu_read(0x3F00) & 0x3F;
+
+        if (control.enable_nmi)
+            enqueue_nmi();
+    }
+
+    scanline++;
+    if (scanline > 261)
+    {
+        scanline = -1;
+        RENDER_ENABLED = true;
+    }
+    return;
+}
 void IRAM_ATTR ppu_execute()
 {
     if (scanline == -1)
@@ -346,11 +548,11 @@ void IRAM_ATTR ppu_execute()
             transfer_address_x();
             vaddr = build_background_scanline(scanline, vaddr, fine_x);
         }
-    
+
         if (dots == 256)
         {
-            //start_cycles = xthal_get_ccount();
-            // SPRITE EVALUATION
+            // start_cycles = xthal_get_ccount();
+            //  SPRITE EVALUATION
             sprite_cnt = 0;
             sprite_zero_on_scanline = false;
             std::memset(sprites_on_scanline, 0xFF, 8 * sizeof(_OAM));
@@ -410,7 +612,8 @@ void IRAM_ATTR ppu_execute()
                 }
                 byte p_l = ppu_read(addr_l);
                 byte p_h = ppu_read(addr_l + 8);
-                if(attr & 0x40){
+                if (attr & 0x40)
+                {
                     p_l = flip_byte[p_l];
                     p_h = flip_byte[p_h];
                 }
@@ -513,25 +716,28 @@ void IRAM_ATTR ppu_execute()
             // Serial.printf("Scanline rendering took %d cycles!", end_cycles - start_cycles);
         }
     }
-    if(scanline == 241 && dots == 1){
+    if (scanline == 241 && dots == 1)
+    {
         set_vblank();
         transparent_pixel_color = ppu_read(0x3F00) & 0x3F;
-        if(control.enable_nmi){
+        if (control.enable_nmi)
+        {
             enqueue_nmi();
         }
     }
 
     dots++;
-    if(dots > 340){
+    if (dots > 340)
+    {
         dots = 0;
         scanline++;
-        if(scanline > 261){
+        if (scanline > 261)
+        {
             scanline = -1;
             RENDER_ENABLED = true;
         }
     }
 }
-
 
 // HELPER FUNCTIONS
 byte flip_byte_fn(byte x)
@@ -553,7 +759,7 @@ void generate_flip_byte_lt()
     }
 }
 
-//No longer needed
+// No longer needed
 void inline IRAM_ATTR clock_shifters()
 {
     // if (mask.render_background)
