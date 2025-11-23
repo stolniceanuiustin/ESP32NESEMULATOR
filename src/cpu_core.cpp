@@ -14,33 +14,35 @@
 #define DEBUG
 
 using std::cout;
-
+typedef void (*cpu_op_fn)(uint16_t address);
+typedef void (*cpu_op_fn_acc)();
 const uint16_t null_address = 0;
 
-
-void cpu_init() {
-	SP = 0xFD;
-	PC = read_abs_address(RESET_VECTOR);
-	pending_nmi = false;
+void cpu_init()
+{
+    SP = 0xFD;
+    PC = read_abs_address(RESET_VECTOR);
+    pending_nmi = false;
 }
-void cpu_reset() {
-	A = 0;
-	X = 0;
-	Y = 0;
-	SP = 0xFD;	// it decreases with pushing
-	PC = read_abs_address(RESET_VECTOR);
-	C = 0;	// carry
-	Z = 0;	// zero
-	I = 1;
-	D = 0;
-	B = 0;
-	O = 0;
-	N = 0;
-	bus_reset();
-	cycles = 0;
-	elapsed_cycles = 0;
-	estimated_cycles = 0;
-	state = FETCH_INSTRUCTION;
+void cpu_reset()
+{
+    A = 0;
+    X = 0;
+    Y = 0;
+    SP = 0xFD; // it decreases with pushing
+    PC = read_abs_address(RESET_VECTOR);
+    C = 0; // carry
+    Z = 0; // zero
+    I = 1;
+    D = 0;
+    B = 0;
+    O = 0;
+    N = 0;
+    bus_reset();
+    cycles = 0;
+    elapsed_cycles = 0;
+    estimated_cycles = 0;
+    state = FETCH_INSTRUCTION;
 }
 
 byte IRAM_ATTR read_pc()
@@ -81,7 +83,6 @@ uint16_t IRAM_ATTR pop_address()
     return to_return;
 }
 
-
 uint16_t IRAM_ATTR read_address(byte offset)
 {
     uint16_t val = read(offset + 1); // little endian
@@ -92,7 +93,7 @@ uint16_t IRAM_ATTR read_address(byte offset)
 
 // The difference between read_address and read_abs_address is that
 // read_abs_address takes a 16bit offset(reads the absolute address)
-uint16_t IRAM_ATTR  read_abs_address(uint16_t offset)
+uint16_t IRAM_ATTR read_abs_address(uint16_t offset)
 {
     uint16_t val = read(offset + 1); // little endian
     val <<= 8;
@@ -129,52 +130,49 @@ bool reset()
     return true;
 }
 
-void IRAM_ATTR run_instruction_group1(uint16_t address)
-{
-    switch (inst.aaa)
+static const cpu_op_fn group1_table[8] =
     {
-    case 0x0:
-        ORA(address);
-        break;
-    case 0x1:
-        AND(address);
-        break;
-    case 0x2:
-        EOR(address);
-        break;
-    case 0x3:
-        ADC(address);
-        break;
-    case 0x4:
-        STA(address);
-        break;
-    case 0x5:
-        LDA(address);
-        break;
-    case 0x6:
-        CMP(address);
-        break;
-    case 0x7:
-        SBC(address);
-        break;
-    }
-}
+        ORA,
+        AND,
+        EOR,
+        ADC,
+        STA,
+        LDA,
+        CMP,
+        SBC};
+
+static const cpu_op_fn group2_table_noacc[8] =
+    {
+        ASL,
+        ROL,
+        LSR,
+        ROR,
+        STX,
+        LDX,
+        DECC,
+        INC};
+
+static const cpu_op_fn_acc group2_table_acc[4] = {
+    ASL_acc,
+    ROL_acc,
+    LSR_acc,
+    ROR_acc};
 
 void IRAM_ATTR run_instruction_group2(uint16_t address, bool accumulator)
 {
     switch (inst.aaa)
     {
     case 0x0:
-        ASL(address, accumulator);
+        ASL_b(address, accumulator);
         break;
     case 0x1:
-        ROL(address, accumulator);
+        ROL_b(address, accumulator);
         break;
     case 0x2:
-        LSR(address, accumulator);
+        LSR_b(address, accumulator);
         break;
     case 0x3:
-        ROR(address, accumulator);
+        ROR_b(address, accumulator);
         break;
     case 0x4:
         STX(address);
@@ -284,7 +282,7 @@ void IRAM_ATTR run_instruction_group_sb1()
     }
 }
 
-void IRAM_ATTR  run_instruction_group_sb2()
+void IRAM_ATTR run_instruction_group_sb2()
 {
     switch (inst.opcode)
     {
@@ -333,49 +331,71 @@ CPU_VARS pack_vars()
 
 // This function runes one opcode, not one cycle. My emulator does not aim to be
 // cycle accurate CPU EXECUTE NOW DOES ONLY ONE CLOCK
+static int DRAM_ATTR OPCODE_duration[256] = {2, 2, 2, 2, 3, 2, 2, 2, 3, 2, 2, 2, 4, 2, 2, 2, 3,
+                                             2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 6, 2, 2,
+                                             2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 4,
+                                             2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 6, 2, 2, 2, 3, 2, 2,
+                                             2, 3, 2, 2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 4, 2, 2, 2, 2,
+                                             2, 2, 2, 2, 2, 2, 2, 6, 2, 2, 2, 3, 2, 2, 2, 4, 2, 2,
+                                             2, 2, 2, 2, 2, 3, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 2,
+                                             2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                                             2, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                                             2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 2,
+                                             2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                                             2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 4, 2, 2,
+                                             2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                                             2, 2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2,
+                                             2, 2, 2, 2, 2};
 
+// Simplifying instruction duration calculations saves 10 ESP cycles/CPU cycle(HUGE!)
+uint32_t remaining_cycles = 0;
 void IRAM_ATTR cpu_clock()
 {
-    if (state == FETCH_INSTRUCTION)
+    if (remaining_cycles)
     {
-        fetch_instruction();
-        estimated_cycles = estimate_cycles();
-        if (estimated_cycles == -1)
-        {
-            estimated_cycles = 2;
-        }
-        elapsed_cycles = 1;
-        state = WAIT_FOR_N_CYCLES;
+        remaining_cycles--;
     }
-    else if (state == WAIT_FOR_N_CYCLES)
+    else
     {
-        elapsed_cycles++;
-        if (elapsed_cycles == estimated_cycles)
-        {
-            state = EXECUTE;
-        }
-    }
-    if (state == EXECUTE)
-    {
-        state = FETCH_INSTRUCTION;
         cpu_execute();
+        fetch_instruction();
+        remaining_cycles += OPCODE_duration[inst.opcode];
     }
 }
-
+// void IRAM_ATTR cpu_clock()
+// {
+//     if (state == FETCH_INSTRUCTION)
+//     {
+//         fetch_instruction();
+//         // TODO : Check this. One scanline will be glitched if this optimization is enabled BUT it saves 30 ESP cycles / cpu cycle
+//         estimated_cycles = OPCODE_duration[inst.opcode];
+//         // estimated_cycles = estimate_cycles();
+//         if (estimated_cycles == -1)
+//         {
+//             estimated_cycles = 2;
+//         }
+//         elapsed_cycles = 1;
+//         state = WAIT_FOR_N_CYCLES;
+//     }
+//     else if (state == WAIT_FOR_N_CYCLES)
+//     {
+//         elapsed_cycles++;
+//         if (elapsed_cycles == estimated_cycles)
+//         {
+//             state = EXECUTE;
+//         }
+//     }
+//     if (state == EXECUTE)
+//     {
+//         state = FETCH_INSTRUCTION;
+//         cpu_execute();
+//     }
+// }
 
 // TODO: CHange this to be a boolean.
 void IRAM_ATTR cpu_execute()
 {
-    CPU_VARS cpu_old_vars;
-    if (pending_nmi == true)
-    {
-        trigger_nmi();
-        state = WAIT_FOR_N_CYCLES;
-        estimated_cycles = 7;
-        elapsed_cycles = 1;
-        return;
-    }
-    else
+    if (!pending_nmi)
     {
         inst.opcode = read_pc();
         inst.aaa = (0xE0 & inst.opcode) >> 5;      // first 3 bits of the opcode
@@ -384,33 +404,11 @@ void IRAM_ATTR cpu_execute()
         inst.xx = (0b11000000 & inst.opcode) >> 6; // first 2 bits(xx)
         inst.y = (0b00100000 & inst.opcode) >> 5;  // third bit from the left;
         bool onaddress_group2 = false;
-        bool page_cross = false;
-        if (PC == 0xFFFF)
-        {
-            return;
-        }
         byte last_5_bits = (0b00011111 & inst.opcode);
         byte low_nibble = inst.opcode & 0x0F;
         byte high_nibble = inst.opcode >> 4;
         uint16_t address = 0;
 
-        // // Some unofficial opcodes(not all yet)
-        // if (inst.opcode == 0x04 || inst.opcode == 0x44 || inst.opcode == 0x64)
-        // {
-        //     PC += 1;
-        //     cycles += 3;
-        // }
-        // else if (inst.opcode == 0x0C)
-        // {
-        //     PC += 2;
-        //     cycles += 4;
-        // }
-        // else if (inst.opcode == 0x14 || inst.opcode == 0x34 || inst.opcode == 0x54 ||
-        //          inst.opcode == 0x74 || inst.opcode == 0xD4 || inst.opcode == 0xF4)
-        // {
-        //     PC += 1;
-        //     cycles += 4;
-        // }
         if (low_nibble == 0x08)
         {
             run_instruction_group_sb1();
@@ -439,9 +437,7 @@ void IRAM_ATTR cpu_execute()
                 PC += branch_position;
                 page_cross = (aux_pc & 0xFF00) != (PC & 0xFF00);
             }
-            // cycles += 2 + (int)branch_succeded + 2 * (int)page_cross;
         }
-
         else if (inst.opcode == 0x00)
         {
             BRK();
@@ -467,30 +463,38 @@ void IRAM_ATTR cpu_execute()
             {
             // compute_addr_mode DOES return an address via reffrence(&)
             case 0x01: // cc = 1
-                address = compute_addr_mode_g1(page_cross);
-                run_instruction_group1(address);
+                address = compute_addr_mode_g1();
+                // run_instruction_group1(address);
+                group1_table[inst.aaa](address);
                 break;
             case 0x02: // cc = 10
                 // Will return address via pointer, the function returns a
                 // boolean.
-                onaddress_group2 = compute_addr_mode_g23(page_cross, address);
+                onaddress_group2 = compute_addr_mode_g23(address);
                 if (onaddress_group2 == true)
-                    run_instruction_group2(address,
-                                           0); // Not accumulator, on address
+                    group2_table_noacc[inst.aaa](address);
+                // run_instruction_group2(address,
+                //                        0); // Not accumulator, on address
                 else
-                    run_instruction_group2(null_address,
-                                           1); // On accumulator
+                    group2_table_acc[inst.aaa]();
                 break;
             case 0x0: // cc = 00
-                compute_addr_mode_g23(page_cross, address);
+                compute_addr_mode_g23(address);
                 run_instruction_group3(address);
                 break;
             }
         return;
     }
-    return; //if it gets here it means it failed
+    else
+    {
+        trigger_nmi();
+        state = WAIT_FOR_N_CYCLES;
+        estimated_cycles = 7;
+        elapsed_cycles = 1;
+        return;
+    }
+    return; // if it gets here it means it failed
 }
-
 
 void inline IRAM_ATTR fetch_instruction()
 {
@@ -501,7 +505,6 @@ void inline IRAM_ATTR fetch_instruction()
     inst.xx = (0b11000000 & inst.opcode) >> 6; // first 2 bits(xx)
     inst.y = (0b00100000 & inst.opcode) >> 5;  // third bit from the left;
 }
-
 
 byte IRAM_ATTR ram_at(uint16_t address)
 {

@@ -41,19 +41,28 @@ uint8_t div3 = 0;
 bool dma_phase = false;
 
 /*
-Takes on average ~400 cycles / bus clock
-With only ppu it takes ~250 (some of it is function overhead) (before sprite rendering happens!)
-With sprite rendering it takes somewhere near 340 cycles
-So this is the thing to optimize!!
-CPU is pretty efficient
-With only cpu it takes  60 cycles (so cpu is almost as optimized as it can be?)
+It takes 100 ESP Cycles/CPU Cycle on average! MUST OPTIMIZE THIS
+It takes around ~566952 ESP cycles / scanline rendered! => More than half the CPU time is taken by PPU rendering, which is ok.
+if i get the CPU emulation to take only the other half of the CPU time, then this can run in 60FPS;
 */
 
-//Rendering scanline then running the cpu works as most interaction between CPU and PPU happens during vblank, when the PPU is doing nothing
+// Rendering scanline then running the cpu works as most interaction between CPU and PPU happens during vblank, when the PPU is doing nothing
+// This may cause small glitches as CPU can stop mid execution of an instruction. Remember, the CPU is not emulated
+// CYCLE-perfect, in the sense that when it fetches an instruction it calculates how long it would take, wait for that ammount ofcycles and then
+// run the instruction.
+uint64_t cpu_cycles_avg = 0;
+uint32_t cpu_cycles_cnt = 0;
+uint32_t scanline_avg = 0;
 inline void bus_clock_t()
 {
-    ppu_render_scanline(); 
-    for (int i = 0; i < 114; i++)
+    // start_cycles_d = xthal_get_ccount();
+    ppu_render_scanline();
+    // end_cycles_d = xthal_get_ccount();
+    // scanline_avg += end_cycles_d - start_cycles_d;
+    // it should go from (0, 341/3) but since 341/3 = 113.66666, we round to 113. Rounding to 114 causes a small glitch on the
+    // scanline when sprite0 hit happens ()
+    // start_cycles_d = xthal_get_ccount();
+    for (int i = 0; i < 113; i++)
     {
         if (!dma_transfer)
         {
@@ -89,7 +98,24 @@ inline void bus_clock_t()
             dma_phase = !dma_phase;
         }
     }
+    // end_cycles_d = xthal_get_ccount();
+    // uint32_t my_cycles = end_cycles_d - start_cycles_d;
+    // cpu_cycles_cnt += 113;
+    // cpu_cycles_avg += my_cycles;
+    // Serial.printf("On average %u ESP cycles/CPU Cycle\n", my_cycles/113);
 }
+
+// void generate_lookup_table()
+// {
+// 	int lut_value;
+// 	for(int i=0; i<=0xFF; i++)
+// 	{
+// 		inst.opcode = i;
+// 		lut_value = estimate_cycles();
+// 		Serial.printf("%d, ", lut_value);
+
+// 	}
+// }
 
 void setup()
 {
@@ -115,6 +141,7 @@ void setup()
         exit(-1);
 
     Serial.println("READ FILE SUCCESFULLY\n");
+    // generate_lookup_table();
     screen_init();
     bus_init();
     cpu_init();
@@ -190,15 +217,17 @@ void IRAM_ATTR Core0Loop(void *parameter)
     // esp_task_wdt_deinit(); // disable task WDT
     for (;;)
     {
-        start_cycles_d = xthal_get_ccount();
-        for (int i = 0; i <= 10000; i++)
-        {
-            bus_clock_t();
-        }
-        end_cycles_d = xthal_get_ccount();
-        uint32_t my_cycles = end_cycles_d - start_cycles_d;
-        Serial.printf("On average %u ESP cycles/NES cycle\n", my_cycles / 100000);
 
+        for (int i = 0; i <= 5000; i++)
+        {
+            //            start_cycles_d = xthal_get_ccount();
+            bus_clock_t();
+            // end_cycles_d = xthal_get_ccount();
+            // uint32_t my_cycles = end_cycles_d - start_cycles_d;
+            // Serial.printf("On average %u ESP cycles/NES Scanline\n", my_cycles);
+        }
+        // Serial.printf("On average %u ESP cycles/CPU Cycle\n", cpu_cycles_avg / cpu_cycles_cnt);
+        // Serial.printf("On average %u ESP cycles/Scanline\n", scanline_avg / 5000);
         vTaskDelay(1); // keep the watchdog happy!
     }
 }

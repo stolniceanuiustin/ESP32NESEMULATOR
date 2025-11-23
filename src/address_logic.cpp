@@ -1,15 +1,13 @@
 #include "cpu.h"
 
-//This contains all the address logic, as explained here:
-//https://www.nesdev.org/obelisk-6502-guide/addressing.html
-
+// This contains all the address logic, as explained here:
+// https://www.nesdev.org/obelisk-6502-guide/addressing.html
 
 const byte last_byte = 0xFF; // 00...011111111
 
-uint16_t IRAM_ATTR  compute_addr_mode_g1(bool &page_cross)
+uint16_t IRAM_ATTR compute_addr_mode_g1()
 {
     uint16_t address = 0; // The first byte must be 0
-    page_cross = false;
     switch (inst.bbb)
     {
     case 0x0: //(ZERO PAGE, X). Next byte + X represents an adress in zero page that needs to be refferenced
@@ -49,7 +47,6 @@ uint16_t IRAM_ATTR  compute_addr_mode_g1(bool &page_cross)
         address = (high_byte << 8) | low_byte;
         uint16_t aux_addr = address;
         address += Y;
-        page_cross = (aux_addr & 0xFF00) != (address & 0xFF00);
         break;
     }
     case 0x05: // zero page, X; basically zeropage_addres + x
@@ -64,7 +61,6 @@ uint16_t IRAM_ATTR  compute_addr_mode_g1(bool &page_cross)
         address = read_abs_address(PC);
         uint16_t aux_addr = address;
         address += Y;
-        page_cross = (aux_addr & 0xFF00) != (address & 0xFF00);
 
         PC += 2;
         break;
@@ -76,19 +72,15 @@ uint16_t IRAM_ATTR  compute_addr_mode_g1(bool &page_cross)
             int high_byte = address >> 8;
             PC += 2;
             address += X;
-            int high_byte_after_increment = address >> 8;
-            if (high_byte < high_byte_after_increment)
-                page_cross = true;
             break;
         }
     }
     return address;
 }
 
-bool IRAM_ATTR compute_addr_mode_g23(bool &page_cross, uint16_t &address_to_return)
+bool IRAM_ATTR compute_addr_mode_g23(uint16_t &address_to_return)
 {
     uint16_t address = 0;
-    page_cross = false;
     if (inst.opcode != 0x004C && inst.opcode != 0x006C) // EXCLUDE THE JUMPS;
     {
         switch (inst.bbb)
@@ -130,30 +122,22 @@ bool IRAM_ATTR compute_addr_mode_g23(bool &page_cross, uint16_t &address_to_retu
         {
             break;
         }
-        case 0x7: // absolute, x
-        {         // THIS could be more compact but i don't want to mess with the pagecross logic
+        case 0x7: // absolute, x or y
+        {
             address = read_abs_address(PC);
             PC += 2;
             // LDX: absolute, y instead of X
-            //if (inst.aaa == 0x7 && inst.cc == 0x2)
-            if(inst.opcode == 0xBE)
+            // if (inst.aaa == 0x7 && inst.cc == 0x2)
+            if (inst.opcode == 0xBE)
             {
-                int high_byte = address >> 8; // We get the first 4 bits -> one digit in Hexa
                 address += Y;
-                int high_byte_after_increment = address >> 8;
-                if (high_byte < high_byte_after_increment)
-                    page_cross = true;
                 break;
             }
             else
             {
-                int high_byte = address >> 8; // We get the first 4 bits -> one digit in Hexa
                 address += X;
-                int high_byte_after_increment = address >> 8;
-                if (high_byte < high_byte_after_increment)
-                    page_cross = true;
             }
-                
+
             break;
         }
         }

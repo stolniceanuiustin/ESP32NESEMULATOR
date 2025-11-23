@@ -1,56 +1,52 @@
 #include "cpu.h"
 
-
-//Here are defined all the cpu instructions. i know this file looks long but each function is O(1) and quite simple actually.
-//full documentation of all instructions can be found here:
-//https://llx.com/Neil/a2/opcodes.html
-//https://www.nesdev.org/obelisk-6502-guide/
+// Here are defined all the cpu instructions. i know this file looks long but each function is O(1) and quite simple actually.
+// full documentation of all instructions can be found here:
+// https://llx.com/Neil/a2/opcodes.html
+// https://www.nesdev.org/obelisk-6502-guide/
 //
-
+inline void set_ZN(byte value)
+{
+    Z = (value == 0) ? 1 : 0;
+    N = (value & 0x80) ? 1 : 0; //Checks bit 7 if it's set or not
+}
 /*
-ADDRESSED INSTRUCTIONS - THE HARDEST 
+ADDRESSED INSTRUCTIONS - THE HARDEST
 */
 
-
 // GROUP 1 INSTRUCTIOS
-void ORA(uint16_t address)
+void IRAM_ATTR ORA(uint16_t address)
 {
     // OR between accumulator and the contents at the given address
     A = A | read(address);
     set_ZN(A);
-
 }
 
-void AND(uint16_t address)
+void IRAM_ATTR AND(uint16_t address)
 {
     byte operand = read(address);
     A = A & operand;
     set_ZN(A);
-
-
 }
 
-void EOR(uint16_t address)
+void IRAM_ATTR EOR(uint16_t address)
 {
     A = A ^ read(address);
     set_ZN(A);
-
-    
 }
 
-void ADC(uint16_t address)
+void IRAM_ATTR ADC(uint16_t address)
 {
     byte operand = read(address);
     uint16_t result = (uint16_t)A + (uint16_t)(operand) + (uint16_t)(C);
-    C = result > 0x00FF ? 1 : 0; 
+    C = result > 0x00FF ? 1 : 0;
     bool overflow = ~(A ^ operand) & (A ^ result) & 0x80;
     O = overflow ? 1 : 0;
     A = (byte)(result & 0x00FF);
     set_ZN(A);
-
 }
 
-void STA(uint16_t address)
+void IRAM_ATTR STA(uint16_t address)
 {
     // Can't use IMEDIATE ADDRESSING
     // Stores the contents of the accumulator in memory
@@ -60,16 +56,16 @@ void STA(uint16_t address)
 
 void LDA(uint16_t address)
 {
-    //Loads A from memory
+    // Loads A from memory
     A = read(address);
     set_ZN(A);
 }
 
 void CMP(uint16_t address)
 {
-    //TODO not sure if the flags are set correctly but i think they are, will find out in unit testing
+    // TODO not sure if the flags are set correctly but i think they are, will find out in unit testing
     uint16_t result = A - read(address);
-    //cpu->SR &= ~(CARRY | NEGATIVE | ZERO);
+    // cpu->SR &= ~(CARRY | NEGATIVE | ZERO);
     C = !(result & 0xFF00) ? 1 : 0;
     set_ZN(result);
 }
@@ -77,19 +73,25 @@ void CMP(uint16_t address)
 void SBC(uint16_t address)
 {
     byte operand = read(address);
-    operand = ~operand; 
-    uint16_t result = (uint16_t)A + (uint16_t)(operand) + (uint16_t)(C);     //Accumulator + address + carry
-    
-    C = result > 0x00FF ? 1 : 0;    //if more than 1 byte => carry
+    operand = ~operand;
+    uint16_t result = (uint16_t)A + (uint16_t)(operand) + (uint16_t)(C); // Accumulator + address + carry
+
+    C = result > 0x00FF ? 1 : 0; // if more than 1 byte => carry
     bool overflow = ~(A ^ operand) & (A ^ result) & 0x80;
     O = overflow ? 1 : 0;
     A = (byte)(result & 0x00FF);
     set_ZN(A);
-
 }
 
+void IRAM_ATTR ASL_acc()
+{
+    uint16_t carry_flag = A & (1 << 7);
+    C = !!carry_flag;
+    A = A << 1;
+    set_ZN(A);
+}
 
-void ASL(uint16_t address, bool accumulator)
+void ASL_b(uint16_t address, bool accumulator)
 {
     // Arithmetic shift left
     // Carry = old bit 7
@@ -97,10 +99,7 @@ void ASL(uint16_t address, bool accumulator)
     if (accumulator)
     {
         uint16_t carry_flag = A & (1 << 7);
-        if (carry_flag)
-            C = 1;
-        else
-            C = 0;
+        C = !!carry_flag;
 
         A = A << 1;
         set_ZN(A);
@@ -109,15 +108,33 @@ void ASL(uint16_t address, bool accumulator)
     {
         byte operand = read(address);
         uint16_t carry_flag = operand & (1 << 7);
-        if (carry_flag)
-            C = 1;
-        else
-            C = 0;
+        C = !!carry_flag;
         cpu_write(address, operand << 1);
         set_ZN(read(address));
     }
 }
-void ROL(uint16_t address, bool accumulator)
+
+void IRAM_ATTR ASL(uint16_t address)
+{
+    byte operand = read(address);
+    uint16_t carry_flag = operand & (1 << 7);
+    C = !!carry_flag;
+    cpu_write(address, operand << 1);
+    set_ZN(read(address));
+}
+
+void IRAM_ATTR ROL_acc()
+{
+    uint16_t carry_flag = A & (1 << 7);
+    A = A << 1;
+    A &= ~1;   // Clear last bit;
+    A = A | C; // Set last bit to carry (the old carry, the documentation says so)
+
+    C = !!carry_flag;
+    set_ZN(A);
+}
+
+void IRAM_ATTR ROL_b(uint16_t address, bool accumulator)
 {
     // rotate left
     if (accumulator)
@@ -127,10 +144,7 @@ void ROL(uint16_t address, bool accumulator)
         A &= ~1;   // Clear last bit;
         A = A | C; // Set last bit to carry (the old carry, the documentation says so)
 
-        if (carry_flag)
-            C = 1;
-        else
-            C = 0;
+        C = !!carry_flag;
 
         set_ZN(A);
     }
@@ -142,14 +156,33 @@ void ROL(uint16_t address, bool accumulator)
         operand &= ~1;
         operand |= C;
         cpu_write(address, operand);
-        if (carry_flag)
-            C = 1;
-        else
-            C = 0;
+        C = !!carry_flag;
         set_ZN(operand);
     }
 }
-void LSR(uint16_t address, bool accumulator)
+
+void IRAM_ATTR ROL(uint16_t address)
+{
+    byte operand = read(address);
+    uint16_t carry_flag = operand & (1 << 7);
+    operand = operand << 1;
+    operand &= ~1;
+    operand |= C;
+    cpu_write(address, operand);
+    C = !!carry_flag;
+    set_ZN(operand);
+}
+
+void IRAM_ATTR LSR_acc()
+{
+    uint16_t carry_flag = A & 1;
+    A = A >> 1;
+    A &= ~(1 << 7); // clear first bit(should be clear already);
+    C = !!carry_flag;
+    set_ZN(A);
+}
+
+void LSR_b(uint16_t address, bool accumulator)
 {
     // Logical shift right
     if (accumulator)
@@ -158,10 +191,7 @@ void LSR(uint16_t address, bool accumulator)
         A = A >> 1;
         A &= ~(1 << 7); // clear first bit(should be clear already);
 
-        if (carry_flag)
-            C = 1;
-        else
-            C = 0;
+        C = !!carry_flag;
         set_ZN(A);
     }
     else
@@ -171,16 +201,35 @@ void LSR(uint16_t address, bool accumulator)
         operand = operand >> 1;
         operand &= ~(1 << 7);
         cpu_write(address, operand);
-        if (carry_flag)
-            C = 1;
-        else
-            C = 0;
+        C = !!carry_flag;
         set_ZN(operand);
     }
 }
 
-//todo : split this up into 2 functions
-void ROR(uint16_t address, bool accumulator)
+void IRAM_ATTR LSR(uint16_t address)
+{
+    byte operand = read(address);
+    uint16_t carry_flag = operand & 1;
+    operand = operand >> 1;
+    operand &= ~(1 << 7);
+    cpu_write(address, operand);
+    C = !!carry_flag;
+    set_ZN(operand);
+}
+
+// todo : split this up into 2 functions
+
+void IRAM_ATTR ROR_acc()
+{
+    int carry_flag = A & 1;
+    A = A >> 1;
+    A &= ~(1 << 7); // clear first bit(should be clear already);
+    A |= C << 7;    // set first bit to carry flag
+
+    C = !!carry_flag;
+    set_ZN(A);
+}
+void IRAM_ATTR ROR_b(uint16_t address, bool accumulator)
 {
     // Rotate right
     if (accumulator)
@@ -190,10 +239,7 @@ void ROR(uint16_t address, bool accumulator)
         A &= ~(1 << 7); // clear first bit(should be clear already);
         A |= C << 7;    // set first bit to carry flag
 
-        if (carry_flag)
-            C = 1;
-        else
-            C = 0;
+        C = !!carry_flag;
         set_ZN(A);
     }
     else
@@ -206,30 +252,42 @@ void ROR(uint16_t address, bool accumulator)
         operand |= C << 7;
         cpu_write(address, operand);
 
-        if (carry_flag)
-            C = 1;
-        else
-            C = 0;
+        C = !!carry_flag;
         set_ZN(operand);
     }
 }
-void STX(uint16_t address)
+void IRAM_ATTR ROR(uint16_t address)
+{
+    // Rotate right
+
+    byte operand = read(address);
+    int carry_flag = operand & 1;
+
+    operand = operand >> 1;
+    operand &= ~(1 << 7);
+    operand |= C << 7;
+    cpu_write(address, operand);
+
+    C = !!carry_flag;
+    set_ZN(operand);
+}
+void IRAM_ATTR STX(uint16_t address)
 {
     cpu_write(address, X);
 }
-void LDX(uint16_t address)
+void IRAM_ATTR LDX(uint16_t address)
 {
     X = read(address);
     set_ZN(X);
 }
-void IRAM_ATTR  DECC(uint16_t address)
+void IRAM_ATTR DECC(uint16_t address)
 {
     byte operand = read(address);
     operand -= 1;
     cpu_write(address, operand);
     set_ZN(operand);
 }
-void IRAM_ATTR  INC(uint16_t address)
+void IRAM_ATTR INC(uint16_t address)
 {
     byte operand = read(address);
     operand += 1;
@@ -237,8 +295,7 @@ void IRAM_ATTR  INC(uint16_t address)
     set_ZN(operand);
 }
 
-
-void IRAM_ATTR  BITT(uint16_t address)
+void IRAM_ATTR BITT(uint16_t address)
 {
     // bit test, test if one or more bits are in a target memory location
     // mask patern in A is & with memory to keep zero, overflow, negative etc.
@@ -257,19 +314,17 @@ void IRAM_ATTR  BITT(uint16_t address)
         O = 1;
     else
         O = 0;
-
-
 }
 
-void IRAM_ATTR  JMP_abs(uint16_t jump_address)
+void IRAM_ATTR JMP_abs(uint16_t jump_address)
 {
     PC = jump_address;
 }
 
-void IRAM_ATTR  JMP_indirect(uint16_t jump_address)
+void IRAM_ATTR JMP_indirect(uint16_t jump_address)
 {
     // TODO: ADDRESS BUG FROM ORIGINAL 6502(not a bug in my code)
-    //PC = read_abs_address(jump_address);
+    // PC = read_abs_address(jump_address);
     uint16_t aux_address = 0;
     byte low_byte = read(jump_address);
     uint16_t high_byte_of_addr = jump_address & 0xFF00;
@@ -289,31 +344,28 @@ void IRAM_ATTR LDY(uint16_t address)
     set_ZN(Y);
 }
 
-void IRAM_ATTR  CPY(uint16_t address)
+void IRAM_ATTR CPY(uint16_t address)
 {
-    byte operand = read(address);  
+    byte operand = read(address);
     byte result_byte = Y - operand;
     C = Y >= operand ? 1 : 0;
     set_ZN(result_byte);
-    
 }
 
-void IRAM_ATTR  CPX(uint16_t address)
+void IRAM_ATTR CPX(uint16_t address)
 {
 
     byte operand = read(address);
     byte result_byte = X - operand;
     C = X >= operand ? 1 : 0;
     set_ZN(result_byte);
-    
-
 }
 
 /*
 Single Byte instructions
 */
 
-byte pack_flags()
+byte IRAM_ATTR pack_flags()
 {
     byte to_return = 0;
     to_return |= N << 7;
@@ -326,15 +378,13 @@ byte pack_flags()
     to_return |= C;
 
     return to_return;
-
 }
 
-
-void unpack_flags(byte flags)
+void IRAM_ATTR unpack_flags(byte flags)
 {
     N = ((1 << 7) & flags) >> 7;
     O = ((1 << 6) & flags) >> 6;
-    B = 0;                      //break flag shouldnt change when loded with PLP
+    B = 0; // break flag shouldnt change when loded with PLP
     D = ((1 << 3) & flags) >> 3;
     I = ((1 << 2) & flags) >> 2;
     Z = ((1 << 1) & flags) >> 1;
@@ -351,8 +401,6 @@ void IRAM_ATTR PLP()
 {
     byte flags = pop();
     unpack_flags(flags);
-
-
 }
 
 void IRAM_ATTR PHA()
@@ -360,7 +408,7 @@ void IRAM_ATTR PHA()
     push(A);
 }
 
-void IRAM_ATTR  PLA()
+void IRAM_ATTR PLA()
 {
     A = pop();
     set_ZN(A);
@@ -368,42 +416,36 @@ void IRAM_ATTR  PLA()
 
 void IRAM_ATTR DEY()
 {
-    Y = Y-1;
+    Y = Y - 1;
     set_ZN(Y);
-    
 }
 
 void IRAM_ATTR TAY()
 {
     Y = A;
     set_ZN(Y);
-    
 }
 
 void IRAM_ATTR INY()
 {
-    Y = Y+1;
+    Y = Y + 1;
     set_ZN(Y);
-    
 }
 
 void IRAM_ATTR INX()
 {
-    X = X+1;
+    X = X + 1;
     set_ZN(X);
-    
 }
 
 void IRAM_ATTR CLC()
 {
     C = 0;
-    
 }
 
 void IRAM_ATTR SEC()
 {
     C = 1;
-    
 }
 
 void IRAM_ATTR CLI()
@@ -429,8 +471,8 @@ void IRAM_ATTR CLV()
 
 void IRAM_ATTR CLD()
 {
-    //SHOULDNT USE IN NES EMU
-    //std::cout << "CLD shouldn't be used\n";
+    // SHOULDNT USE IN NES EMU
+    // std::cout << "CLD shouldn't be used\n";
     D = 0;
 }
 
@@ -439,38 +481,33 @@ void IRAM_ATTR SED()
     D = 1;
 }
 
-void IRAM_ATTR  TXA()
+void IRAM_ATTR TXA()
 {
     A = X;
     set_ZN(A);
-
 }
 
-void IRAM_ATTR  TXS()
+void IRAM_ATTR TXS()
 {
     SP = X;
-
 }
 
 void IRAM_ATTR TAX()
 {
     X = A;
     set_ZN(X);
-
 }
 
 void IRAM_ATTR TSX()
 {
     X = SP;
     set_ZN(X);
-
 }
 
 void IRAM_ATTR DEX()
 {
-    X = X-1;
+    X = X - 1;
     set_ZN(X);
-
 }
 
 /*
@@ -485,7 +522,6 @@ void IRAM_ATTR JSR_abs(uint16_t address)
 {
     push_address(PC);
     PC = address;
-
 }
 
 void IRAM_ATTR RTS()
@@ -493,27 +529,26 @@ void IRAM_ATTR RTS()
     uint16_t aux = pop_address();
     aux += 1;
     PC = aux;
-
 }
 
 void IRAM_ATTR BRK()
 {
     int t = 0;
-    if(I == 0)
+    if (I == 0)
     {
         trigger_irq();
         cycles += 7;
     }
-    else cycles+=2;
+    else
+        cycles += 2;
     B = 1;
-    //TODO CHECK THIS: shouldn't happen in NES
-    // cycles += 7;
+    // TODO CHECK THIS: shouldn't happen in NES
+    //  cycles += 7;
 }
-
 
 void IRAM_ATTR trigger_irq()
 {
-    if(I == 0) //interrupts enabled
+    if (I == 0) // interrupts enabled
     {
         SP = 0xFD;
         push_address(PC);
@@ -522,23 +557,23 @@ void IRAM_ATTR trigger_irq()
         push(pack_flags());
         PC = read_abs_address(IRQ_vector);
         I = 1;
-        //std::cout << "IRQ TRIGGERED. CHECK FUNCTION FOR CYCLE COUNT!\n";
+        // std::cout << "IRQ TRIGGERED. CHECK FUNCTION FOR CYCLE COUNT!\n";
     }
 }
 
 void IRAM_ATTR trigger_nmi()
-{   //STACK STARTS AT 0xFD
-    //std::cout << "===============NMI TRIGGERED===============\n";
+{ // STACK STARTS AT 0xFD
+    // std::cout << "===============NMI TRIGGERED===============\n";
     SP = 0xFD;
     push_address(PC);
     push(pack_flags());
     PC = read_abs_address(NMI_vector);
     I = 1;
-    //TODO check if this was an issue
+    // TODO check if this was an issue
     pending_nmi = false;
 }
 
-void RTI()
+void IRAM_ATTR RTI()
 {
     byte flags = pop();
     unpack_flags(flags);

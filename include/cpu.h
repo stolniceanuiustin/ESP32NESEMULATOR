@@ -85,12 +85,8 @@ int estimate_cycles_group_3();
 bool estimate_page_cross_g23();
 
 // First group of instructions
-inline void set_ZN(byte value)
-{
-    Z = (value == 0) ? 1 : 0;
-    N = (value & 0x80) ? 1 : 0; //Checks bit 7 if it's set or not
-}
-uint16_t compute_addr_mode_g1(bool &page_cross);
+
+uint16_t compute_addr_mode_g1();
 void run_instruction_group1(uint16_t address);
 void ORA(uint16_t address);
 void AND(uint16_t address);
@@ -102,12 +98,20 @@ void CMP(uint16_t address);
 void SBC(uint16_t address);
 
 // Second group of instructions
-bool compute_addr_mode_g23(bool &page_cross, uint16_t &address_to_return);
+bool compute_addr_mode_g23(uint16_t &address_to_return);
 void run_instruction_group2(uint16_t address, bool accumulator);
-void ASL(uint16_t address, bool accumulator);
-void ROL(uint16_t address, bool accumulator);
-void LSR(uint16_t address, bool accumulator);
-void ROR(uint16_t address, bool accumulator);
+void ASL_acc();
+void ASL(uint16_t address);
+void ROL_acc();
+void ROL(uint16_t address);
+void LSR_acc();
+void LSR(uint16_t address);
+void ROR_acc();
+void ROR(uint16_t address);
+void ASL_b(uint16_t address, bool accumulator);
+void ROL_b(uint16_t address, bool accumulator);
+void LSR_b(uint16_t address, bool accumulator);
+void ROR_b(uint16_t address, bool accumulator);
 void STX(uint16_t address);
 void LDX(uint16_t address);
 void DECC(uint16_t address); // dec is defined as 10 somewhere?
