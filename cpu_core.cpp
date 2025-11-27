@@ -18,39 +18,8 @@ typedef void (*cpu_op_fn)(uint16_t address);
 typedef void (*cpu_op_fn_acc)();
 const uint16_t null_address = 0;
 
-void cpu_init()
-{
-    SP = 0xFD;
-    PC = read_abs_address(RESET_VECTOR);
-    pending_nmi = false;
-}
-void cpu_reset()
-{
-    A = 0;
-    X = 0;
-    Y = 0;
-    SP = 0xFD; // it decreases with pushing
-    PC = read_abs_address(RESET_VECTOR);
-    C = 0; // carry
-    Z = 0; // zero
-    I = 1;
-    D = 0;
-    B = 0;
-    O = 0;
-    N = 0;
-    bus_reset();
-    cycles = 0;
-    elapsed_cycles = 0;
-    estimated_cycles = 0;
-    state = FETCH_INSTRUCTION;
-}
 
-byte IRAM_ATTR read_pc()
-{
-    byte val = read(PC);
-    PC++;
-    return val;
-}
+
 
 // stack opperatons. remember, addresses are 16 bit wide!
 void IRAM_ATTR push(byte x)
@@ -108,28 +77,36 @@ uint16_t IRAM_ATTR read_address_from_pc()
     return address;
 }
 
-bool reset()
+
+Instruction decode_table[256];
+byte high_nibble_table[256];
+byte low_nibble_table[256];
+byte last_5_bits_table[256];
+
+byte *branch_flag_table[4] = {
+    &N,
+    &O,
+    &C,
+    &Z};
+
+void build_decode_table()
 {
-    A = 0;
-    X = 0;
-    Y = 0;
-    SP = 0xFD; // it decreases with pushing
-    PC = read_abs_address(RESET_VECTOR);
-    C = 0; // carry
-    Z = 0; // zero
-    I = 1;
-    D = 0;
-    B = 0;
-    O = 0;
-    N = 0;
-    bus_reset();
-    cycles = 0;
-    elapsed_cycles = 0;
-    estimated_cycles = 0;
-    state = FETCH_INSTRUCTION;
-    return true;
+    for (int op = 0; op < 256; op++)
+    {
+        decode_table[op].aaa = (op >> 5) & 0x07;
+        decode_table[op].bbb = (op >> 2) & 0x07;
+        decode_table[op].cc = op & 0x03;
+        decode_table[op].xx = op >> 6;
+        decode_table[op].y = (op >> 5) & 1;
+        decode_table[op].opcode = op;
+
+        last_5_bits_table[op] = (0b00011111 & op);
+        low_nibble_table[op] = op & 0x0F;
+        high_nibble_table[op] = op >> 4;
+    }
 }
 
+// i dont know why formating this is so weird?
 static const cpu_op_fn group1_table[8] =
     {
         ORA,
@@ -313,6 +290,7 @@ void init()
 {
     SP = 0xFD;
     PC = read_abs_address(0xFFFC);
+    build_decode_table();
     pending_nmi = false;
 }
 
@@ -358,55 +336,24 @@ void IRAM_ATTR cpu_clock()
     else
     {
         cpu_execute();
-        fetch_instruction();
-        remaining_cycles += OPCODE_duration[inst.opcode];
+        // fetch_instruction();
+        // remaining_cycles += OPCODE_duration[inst.opcode];
     }
 }
-// void IRAM_ATTR cpu_clock()
-// {
-//     if (state == FETCH_INSTRUCTION)
-//     {
-//         fetch_instruction();
-//         // TODO : Check this. One scanline will be glitched if this optimization is enabled BUT it saves 30 ESP cycles / cpu cycle
-//         estimated_cycles = OPCODE_duration[inst.opcode];
-//         // estimated_cycles = estimate_cycles();
-//         if (estimated_cycles == -1)
-//         {
-//             estimated_cycles = 2;
-//         }
-//         elapsed_cycles = 1;
-//         state = WAIT_FOR_N_CYCLES;
-//     }
-//     else if (state == WAIT_FOR_N_CYCLES)
-//     {
-//         elapsed_cycles++;
-//         if (elapsed_cycles == estimated_cycles)
-//         {
-//             state = EXECUTE;
-//         }
-//     }
-//     if (state == EXECUTE)
-//     {
-//         state = FETCH_INSTRUCTION;
-//         cpu_execute();
-//     }
-// }
 
-// TODO: CHange this to be a boolean.
 void IRAM_ATTR cpu_execute()
 {
     if (!pending_nmi)
     {
-        inst.opcode = read_pc();
-        inst.aaa = (0xE0 & inst.opcode) >> 5;      // first 3 bits of the opcode
-        inst.bbb = (0x1C & inst.opcode) >> 2;      // second 3 bits
-        inst.cc = (0x03 & inst.opcode);            // last 2 bits
-        inst.xx = (0b11000000 & inst.opcode) >> 6; // first 2 bits(xx)
-        inst.y = (0b00100000 & inst.opcode) >> 5;  // third bit from the left;
+        byte opcode_aux = read_pc();
+        inst = decode_table[opcode_aux];
+        remaining_cycles += OPCODE_duration[inst.opcode];
+
+        byte low_nibble = low_nibble_table[inst.opcode];
+        byte high_nibble = high_nibble_table[inst.opcode];
+        byte last_5_bits = last_5_bits_table[inst.opcode];
         bool onaddress_group2 = false;
-        byte last_5_bits = (0b00011111 & inst.opcode);
-        byte low_nibble = inst.opcode & 0x0F;
-        byte high_nibble = inst.opcode >> 4;
+
         uint16_t address = 0;
 
         if (low_nibble == 0x08)
@@ -421,21 +368,24 @@ void IRAM_ATTR cpu_execute()
         {
             // Branching instructions
             int8_t branch_position = (int8_t)read_pc();
-            bool branch_succeded = false;
-            bool page_cross = false;
-            uint16_t aux_pc = PC;
-            if (inst.xx == 0b00 && N == inst.y)
-                branch_succeded = true;
-            else if (inst.xx == 0b01 && O == inst.y)
-                branch_succeded = true;
-            else if (inst.xx == 0b10 && C == inst.y)
-                branch_succeded = true;
-            else if (inst.xx == 0b11 && Z == inst.y)
-                branch_succeded = true;
-            if (branch_succeded)
+            uint32_t flag = 0;
+            switch (inst.xx)
             {
+            case 0:
+                flag = N;
+                break;
+            case 1:
+                flag = O;
+                break;
+            case 2:
+                flag = C;
+                break;
+            case 3:
+                flag = Z;
+                break;
+            }
+            if(flag == (inst.y != 0)){
                 PC += branch_position;
-                page_cross = (aux_pc & 0xFF00) != (PC & 0xFF00);
             }
         }
         else if (inst.opcode == 0x00)
@@ -488,9 +438,7 @@ void IRAM_ATTR cpu_execute()
     else
     {
         trigger_nmi();
-        state = WAIT_FOR_N_CYCLES;
-        estimated_cycles = 7;
-        elapsed_cycles = 1;
+        remaining_cycles += 7;
         return;
     }
     return; // if it gets here it means it failed

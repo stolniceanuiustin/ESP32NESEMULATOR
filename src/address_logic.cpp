@@ -4,6 +4,152 @@
 // https://www.nesdev.org/obelisk-6502-guide/addressing.html
 
 const byte last_byte = 0xFF; // 00...011111111
+uint16_t addr_IMM()
+{
+    uint16_t addr = PC++;
+    return addr;
+}
+
+// this takes (zero_page + x) as pointer
+uint16_t addr_zero_page_x_p()
+{
+    byte zeropage_adr;
+    zeropage_adr = read_pc() + X;
+    byte low_byte = read(zeropage_adr);
+    // IT DOES NOT WRAP ARROUND BY ITS OWN FOR SOME REASON;
+    byte high_byte = read(((zeropage_adr + 1) & 0x00FF));
+    return (high_byte << 8) | low_byte;
+}
+// zero_page + x as absolute address
+uint16_t addr_zero_page_x()
+{
+    uint16_t address;
+    address = read_pc() + X;
+    address &= last_byte;
+    return address;
+}
+// zero_page + y as absolute address
+uint16_t addr_zero_page_y()
+{
+    uint16_t address;
+    address = read_pc() + Y;
+    //only take the last_byte. 0x0F = last_byte
+    address &= last_byte;
+    return address;
+}
+//just an absolute address that is from zero page(as its only one byte wide)
+uint16_t addr_zero_page()
+{
+    return read_pc();
+}
+uint16_t addr_abs()
+{
+    uint16_t address = read_abs_address(PC);
+    PC += 2;
+    return address;
+}
+//(zero page), Y; Takes an address from zero page as a pointer then adds Y to that address
+uint16_t addr_pzero_page_y()
+{
+    uint16_t address;
+    uint16_t zeropage_adr = read_pc();
+    byte low_byte = read(zeropage_adr);
+    byte high_byte = read((zeropage_adr + 1) & 0x00FF);
+    address = (high_byte << 8) | low_byte;
+    uint16_t aux_addr = address;
+    address += Y;
+    return address;
+}
+
+uint16_t addr_abs_y()
+{
+    uint16_t address = read_abs_address(PC);
+    address += Y;
+    PC += 2;
+    return address;
+}
+
+uint16_t addr_abs_x()
+{
+    uint16_t address = read_abs_address(PC);
+    PC += 2;
+    address += X;
+    return address;
+}
+
+// uint16_t addr_zero_page()
+// {
+//     uint16_t address = read_pc();
+//     return address;
+// }
+
+
+
+
+/*
+bool IRAM_ATTR compute_addr_mode_g23(uint16_t &address_to_return)
+{
+    uint16_t address = 0;
+    if (inst.opcode != 0x004C && inst.opcode != 0x006C) // EXCLUDE THE JUMPS;
+    {
+        switch (inst.bbb)
+        {
+        case 0x1: // zero page: an adress in range 0x0000 - 0x0FFF
+        {
+            address = read_pc();
+            break;
+        }
+        case 0x2: // accumulator. there is no address
+            return false;
+
+        case 0x3: // absolute
+        {
+            address = read_abs_address(PC);
+            PC += 2;
+            break;
+        }
+        case 0x4:
+        {
+            break;
+        }
+        case 0x5: // zero page, x
+        {         // STX, LDX use zero page, y not x
+            bool is_using_y = (inst.aaa == 0x4 || inst.aaa == 0x5) && inst.cc == 0x2;
+            byte to_add = is_using_y ? Y : X;
+
+            address = read_pc() + to_add;
+            address &= last_byte;
+
+            break;
+        }
+        case 0x6:
+        {
+            break;
+        }
+        case 0x7: // absolute, x or y
+        {
+            address = read_abs_address(PC);
+            PC += 2;
+            // LDX: absolute, y instead of X
+            // if (inst.aaa == 0x7 && inst.cc == 0x2)
+            if (inst.opcode == 0xBE)
+            {
+                address += Y;
+                break;
+            }
+            else
+            {
+                address += X;
+            }
+
+            break;
+        }
+        }
+    }
+    address_to_return = address;
+    return true;
+}
+
 
 uint16_t IRAM_ATTR compute_addr_mode_g1()
 {
@@ -77,71 +223,4 @@ uint16_t IRAM_ATTR compute_addr_mode_g1()
     }
     return address;
 }
-
-bool IRAM_ATTR compute_addr_mode_g23(uint16_t &address_to_return)
-{
-    uint16_t address = 0;
-    if (inst.opcode != 0x004C && inst.opcode != 0x006C) // EXCLUDE THE JUMPS;
-    {
-        switch (inst.bbb)
-        {
-        case 0x0: // #immediate: literally the next byte in memory
-        {
-            address = PC++;
-            break;
-        }
-        case 0x1: // zero page: an adress in range 0x0000 - 0x0FFF
-        {
-            address = read_pc();
-            break;
-        }
-        case 0x2: // accumulator. there is no address
-            return false;
-
-        case 0x3: // absolute
-        {
-            address = read_abs_address(PC);
-            PC += 2;
-            break;
-        }
-        case 0x4:
-        {
-            break;
-        }
-        case 0x5: // zero page, x
-        {         // STX, LDX use zero page, y not x
-            bool is_using_y = (inst.aaa == 0x4 || inst.aaa == 0x5) && inst.cc == 0x2;
-            byte to_add = is_using_y ? Y : X;
-
-            address = read_pc() + to_add;
-            address &= last_byte;
-
-            break;
-        }
-        case 0x6:
-        {
-            break;
-        }
-        case 0x7: // absolute, x or y
-        {
-            address = read_abs_address(PC);
-            PC += 2;
-            // LDX: absolute, y instead of X
-            // if (inst.aaa == 0x7 && inst.cc == 0x2)
-            if (inst.opcode == 0xBE)
-            {
-                address += Y;
-                break;
-            }
-            else
-            {
-                address += X;
-            }
-
-            break;
-        }
-        }
-    }
-    address_to_return = address;
-    return true;
-}
+*/

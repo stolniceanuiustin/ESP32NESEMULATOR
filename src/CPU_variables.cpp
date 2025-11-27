@@ -2,7 +2,6 @@
 
 
 struct Instruction inst;
-CPU_STATE DRAM_ATTR state = FETCH_INSTRUCTION;
 
 byte A = 0x00;
 byte X = 0x00;
@@ -10,6 +9,7 @@ byte Y = 0x00;
 uint16_t PC = 0x0000;
 byte SP = 0xFD; 
 
+uint32_t opcode = 0;
 
 uint32_t cycles = 0;
 int32_t estimated_cycles = 0;

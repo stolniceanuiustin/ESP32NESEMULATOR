@@ -8,13 +8,14 @@
 inline void set_ZN(byte value)
 {
     Z = (value == 0) ? 1 : 0;
-    N = (value & 0x80) ? 1 : 0; //Checks bit 7 if it's set or not
+    N = (value & 0x80) ? 1 : 0; // Checks bit 7 if it's set or not
 }
 /*
 ADDRESSED INSTRUCTIONS - THE HARDEST
 */
 
 // GROUP 1 INSTRUCTIOS
+
 void IRAM_ATTR ORA(uint16_t address)
 {
     // OR between accumulator and the contents at the given address
@@ -63,9 +64,7 @@ void LDA(uint16_t address)
 
 void CMP(uint16_t address)
 {
-    // TODO not sure if the flags are set correctly but i think they are, will find out in unit testing
     uint16_t result = A - read(address);
-    // cpu->SR &= ~(CARRY | NEGATIVE | ZERO);
     C = !(result & 0xFF00) ? 1 : 0;
     set_ZN(result);
 }

@@ -61,7 +61,7 @@ inline void bus_clock_t()
     // scanline_avg += end_cycles_d - start_cycles_d;
     // it should go from (0, 341/3) but since 341/3 = 113.66666, we round to 113. Rounding to 114 causes a small glitch on the
     // scanline when sprite0 hit happens ()
-    // start_cycles_d = xthal_get_ccount();
+    start_cycles_d = xthal_get_ccount();
     for (int i = 0; i < 113; i++)
     {
         if (!dma_transfer)
@@ -98,10 +98,10 @@ inline void bus_clock_t()
             dma_phase = !dma_phase;
         }
     }
-    // end_cycles_d = xthal_get_ccount();
-    // uint32_t my_cycles = end_cycles_d - start_cycles_d;
-    // cpu_cycles_cnt += 113;
-    // cpu_cycles_avg += my_cycles;
+    end_cycles_d = xthal_get_ccount();
+    uint32_t my_cycles = end_cycles_d - start_cycles_d;
+    cpu_cycles_cnt += 113;
+    cpu_cycles_avg += my_cycles;
     // Serial.printf("On average %u ESP cycles/CPU Cycle\n", my_cycles/113);
 }
 
@@ -226,7 +226,7 @@ void IRAM_ATTR Core0Loop(void *parameter)
             // uint32_t my_cycles = end_cycles_d - start_cycles_d;
             // Serial.printf("On average %u ESP cycles/NES Scanline\n", my_cycles);
         }
-        // Serial.printf("On average %u ESP cycles/CPU Cycle\n", cpu_cycles_avg / cpu_cycles_cnt);
+        Serial.printf("On average %u ESP cycles/CPU Cycle\n", cpu_cycles_avg / cpu_cycles_cnt);
         // Serial.printf("On average %u ESP cycles/Scanline\n", scanline_avg / 5000);
         vTaskDelay(1); // keep the watchdog happy!
     }

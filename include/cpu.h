@@ -7,19 +7,11 @@
 #include "cpu_vars.h"
 
 typedef uint8_t byte;
-
-typedef enum
-{
-    FETCH_INSTRUCTION,
-    WAIT_FOR_N_CYCLES,
-    EXECUTE
-} CPU_STATE;
-
-struct Mem
-{
-    int x;
-};
-
+typedef void (*InstructionHandler)(void);
+static InstructionHandler opcode_table[256];
+void init_instruction_handler_lut();
+void build_decode_table();
+extern uint32_t opcode;
 struct Instruction
 {
     byte aaa;
@@ -39,7 +31,7 @@ extern byte SP; // Stack pointer
 extern uint32_t cycles;
 extern int32_t estimated_cycles;
 extern uint32_t elapsed_cycles;
-
+// extern byte opcode;
 // Cpu Flags
 extern byte C; // carry
 extern byte Z; // zero
@@ -52,19 +44,23 @@ extern byte N; // negative
 void cpu_init();
 void cpu_reset();
 
-
 byte ram_at(uint16_t address);
 byte pack_flags();
 void unpack_flags(byte flags);
 CPU_VARS pack_vars();
-byte read_pc();
+// byte read_pc();
 inline byte read(uint16_t address) { return cpu_read(address); }
 inline void write(uint16_t address, byte data) { cpu_write(address, data); }
-
+byte inline read_pc()
+{
+    byte val = read(PC++);
+    // PC++;
+    return val;
+}
 uint16_t read_address_from_pc();
 uint16_t read_address(byte offset);
 
-extern CPU_STATE state;
+//extern CPU_STATE state;
 void fetch_instruction();
 void cpu_clock();
 void cpu_execute();
@@ -73,7 +69,6 @@ void push(byte x);
 void push_address(uint16_t address);
 byte pop();
 uint16_t pop_address();
-
 
 int estimate_cycles();
 int estimate_cycles_group_sb1();
@@ -85,7 +80,7 @@ int estimate_cycles_group_3();
 bool estimate_page_cross_g23();
 
 // First group of instructions
-
+void branch();
 uint16_t compute_addr_mode_g1();
 void run_instruction_group1(uint16_t address);
 void ORA(uint16_t address);
@@ -175,6 +170,17 @@ inline void enqueue_nmi()
     pending_nmi = true;
 }
 
+
+//addressing modes
+uint16_t addr_IMM(void);
+uint16_t addr_zero_page_x_p(void);
+uint16_t addr_zero_page_x(void);
+uint16_t addr_zero_page_y(void);
+uint16_t addr_zero_page(void);
+uint16_t addr_abs(void);
+uint16_t addr_pzero_page_y(void);
+uint16_t addr_abs_y(void);
+uint16_t addr_abs_x(void);
 
 
 #endif
