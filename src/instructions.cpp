@@ -364,32 +364,6 @@ void IRAM_ATTR CPX(uint16_t address)
 Single Byte instructions
 */
 
-byte IRAM_ATTR pack_flags()
-{
-    byte to_return = 0;
-    to_return |= N << 7;
-    to_return |= O << 6;
-    to_return |= 1 << 5;
-    to_return |= B << 4;
-    to_return |= D << 3;
-    to_return |= I << 2;
-    to_return |= Z << 1;
-    to_return |= C;
-
-    return to_return;
-}
-
-void IRAM_ATTR unpack_flags(byte flags)
-{
-    N = ((1 << 7) & flags) >> 7;
-    O = ((1 << 6) & flags) >> 6;
-    B = 0; // break flag shouldnt change when loded with PLP
-    D = ((1 << 3) & flags) >> 3;
-    I = ((1 << 2) & flags) >> 2;
-    Z = ((1 << 1) & flags) >> 1;
-    C = 1 & flags;
-    return;
-}
 void IRAM_ATTR PHP()
 {
     byte to_push = pack_flags();
@@ -514,7 +488,7 @@ interrupts
 */
 void IRAM_ATTR NOPP()
 {
-    cycles += 2;
+    // cycles += 2;
 }
 
 void IRAM_ATTR JSR_abs(uint16_t address)
@@ -536,10 +510,9 @@ void IRAM_ATTR BRK()
     if (I == 0)
     {
         trigger_irq();
-        cycles += 7;
     }
-    else
-        cycles += 2;
+    // else
+    //     cycles += 2;
     B = 1;
     // TODO CHECK THIS: shouldn't happen in NES
     //  cycles += 7;

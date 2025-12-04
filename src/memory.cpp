@@ -1,6 +1,7 @@
 #include "memory.h"
 
 
+// TODO : When Emulator reaches 60 fps, implement Mappers
 byte cpu_read(uint16_t addr)
 {
     if (addr >= 0x8000 && addr <= 0xFFFF)

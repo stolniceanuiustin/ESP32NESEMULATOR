@@ -41,7 +41,9 @@ uint8_t div3 = 0;
 bool dma_phase = false;
 
 /*
-It takes 100 ESP Cycles/CPU Cycle on average! MUST OPTIMIZE THIS
+It Took 100 ESP Cycles/CPU Cycle on average! 
+It now takes 80 ESP Cycles/CPU Cycle on average, after changing the CPU core to be more efficient - and less readable. 
+
 It takes around ~566952 ESP cycles / scanline rendered! => More than half the CPU time is taken by PPU rendering, which is ok.
 if i get the CPU emulation to take only the other half of the CPU time, then this can run in 60FPS;
 */
@@ -61,7 +63,7 @@ inline void bus_clock_t()
     // scanline_avg += end_cycles_d - start_cycles_d;
     // it should go from (0, 341/3) but since 341/3 = 113.66666, we round to 113. Rounding to 114 causes a small glitch on the
     // scanline when sprite0 hit happens ()
-    start_cycles_d = xthal_get_ccount();
+    //start_cycles_d = xthal_get_ccount();
     for (int i = 0; i < 113; i++)
     {
         if (!dma_transfer)
@@ -98,30 +100,20 @@ inline void bus_clock_t()
             dma_phase = !dma_phase;
         }
     }
-    end_cycles_d = xthal_get_ccount();
-    uint32_t my_cycles = end_cycles_d - start_cycles_d;
-    cpu_cycles_cnt += 113;
-    cpu_cycles_avg += my_cycles;
+    // end_cycles_d = xthal_get_ccount();
+    // uint32_t my_cycles = end_cycles_d - start_cycles_d;
+    // cpu_cycles_cnt += 113;
+    // cpu_cycles_avg += my_cycles;
     // Serial.printf("On average %u ESP cycles/CPU Cycle\n", my_cycles/113);
 }
 
-// void generate_lookup_table()
-// {
-// 	int lut_value;
-// 	for(int i=0; i<=0xFF; i++)
-// 	{
-// 		inst.opcode = i;
-// 		lut_value = estimate_cycles();
-// 		Serial.printf("%d, ", lut_value);
 
-// 	}
-// }
 
 void setup()
 {
     Serial.begin(115200);
     if (!LittleFS.begin(true))
-    { // `true` means format if mount fails
+    { 
         Serial.println("Failed to mount LittleFS");
         while (1)
             ; // stop
@@ -137,22 +129,22 @@ void setup()
     tft.setRotation(0);
     tft.fillScreen(TFT_BLACK);
 
+    // Reads GAME from Cartridge and loads it into RAM
     if (!cartridge_read_file("/smb.bin"))
         exit(-1);
 
     Serial.println("READ FILE SUCCESFULLY\n");
-    // generate_lookup_table();
+
+    // This initializes the eulator!
     screen_init();
     bus_init();
     cpu_init();
     cpu_reset();
     ppu_init();
-    // PC = read_abs_address(0xFFFC);
     uint32_t frames = 0;
 
     xTaskCreatePinnedToCore(Core0Loop, "Core0Loop", 10000, NULL, configMAX_PRIORITIES - 1, &Core0Task, 0);
 
-    // vTaskDelete(NULL);
 }
 
 uint32_t previous_time_s = 0;
@@ -226,7 +218,7 @@ void IRAM_ATTR Core0Loop(void *parameter)
             // uint32_t my_cycles = end_cycles_d - start_cycles_d;
             // Serial.printf("On average %u ESP cycles/NES Scanline\n", my_cycles);
         }
-        Serial.printf("On average %u ESP cycles/CPU Cycle\n", cpu_cycles_avg / cpu_cycles_cnt);
+        //Serial.printf("On average %u ESP cycles/CPU Cycle\n", cpu_cycles_avg / cpu_cycles_cnt);
         // Serial.printf("On average %u ESP cycles/Scanline\n", scanline_avg / 5000);
         vTaskDelay(1); // keep the watchdog happy!
     }

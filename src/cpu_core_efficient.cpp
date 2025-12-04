@@ -18,32 +18,18 @@ typedef void (*cpu_op_fn)(uint16_t address);
 typedef void (*cpu_op_fn_acc)();
 const uint16_t null_address = 0;
 
-// https://www.masswerk.at/6502/6502_instruction_set.html
+// All instructions are explained here: https://www.masswerk.at/6502/6502_instruction_set.html
+// For a better understanding of how the CPU works, check this awesome resource: https://www.nesdev.org/obelisk-6502-guide/
 
-Instruction decode_table[256];
-byte high_nibble_table[256];
-byte low_nibble_table[256];
-byte last_5_bits_table[256];
-void build_decode_table()
-{
-    for (int op = 0; op < 256; op++)
-    {
-        decode_table[op].aaa = (op >> 5) & 0x07;
-        decode_table[op].bbb = (op >> 2) & 0x07;
-        decode_table[op].cc = op & 0x03;
-        decode_table[op].xx = op >> 6;
-        decode_table[op].y = (op >> 5) & 1;
-        decode_table[op].opcode = op;
-
-        last_5_bits_table[op] = (0b00011111 & op);
-        low_nibble_table[op] = op & 0x0F;
-        high_nibble_table[op] = op >> 4;
-    }
-}
 
 void OP_NOOP() {};
 void OP_BRK() { BRK(); };
-void OP_BPL() { branch(); };
+void OP_BPL()
+{
+    int8_t branch_position = (int8_t)read_pc();
+    if (N == 0)
+        PC += branch_position;
+};
 void OP_JSR()
 {
     uint16_t address = read_abs_address(PC);
@@ -51,18 +37,53 @@ void OP_JSR()
     JSR_abs(address);
 }
 
-void OP_BMI() { branch(); };
+void OP_BMI()
+{
+    int8_t branch_position = (int8_t)read_pc();
+    if (N == 1)
+        PC += branch_position;
+};
 void OP_RTI() { RTI(); };
-void OP_BVC() { branch(); };
+void OP_BVC()
+{
+    int8_t branch_position = (int8_t)read_pc();
+    if (O == 0)
+        PC += branch_position;
+};
 void OP_RTS() { RTS(); };
-void OP_BVS() { branch(); };
-void OP_BCC() { branch(); };
+void OP_BVS()
+{
+    int8_t branch_position = (int8_t)read_pc();
+    if (O == 1)
+        PC += branch_position;
+};
+void OP_BCC()
+{
+    int8_t branch_position = (int8_t)read_pc();
+    if (C == 0)
+        PC += branch_position;
+};
 void OP_LDY_IMM() { LDY(addr_IMM()); };
-void OP_BCS() { branch(); };
+void OP_BCS()
+{
+    int8_t branch_position = (int8_t)read_pc();
+    if (C == 1)
+        PC += branch_position;
+};
 void OP_CPY_IMM() { CPY(addr_IMM()); };
-void OP_BNE() { branch(); };
+void OP_BNE()
+{
+    int8_t branch_position = (int8_t)read_pc();
+    if (Z == 0)
+        PC += branch_position;
+};
 void OP_CPX_IMM() { CPX(addr_IMM()); };
-void OP_BEQ() { branch(); };
+void OP_BEQ()
+{
+    int8_t branch_position = (int8_t)read_pc();
+    if (Z == 1)
+        PC += branch_position;
+};
 void OP_ORA_ZP_X_P() { ORA(addr_zero_page_x_p()); };
 void OP_ORA_ZP_P_Y() { ORA(addr_pzero_page_y()); };
 void OP_AND_ZP_X_P() { AND(addr_zero_page_x_p()); };
@@ -188,6 +209,7 @@ void OP_DEC_ABS() { DECC(addr_abs()); };
 void OP_DEC_ABS_X() { DECC(addr_abs_x()); };
 void OP_INC_ABS() { INC(addr_abs()); };
 void OP_INC_ABS_X() { INC(addr_abs_x()); };
+
 void init_instruction_handler_lut()
 {
     for (int i = 0; i <= 0xFF; i++)
@@ -290,7 +312,7 @@ void init_instruction_handler_lut()
     opcode_table[0x59] = OP_EOR_ABS_Y;
     opcode_table[0x69] = OP_ADC_IMM;
     opcode_table[0x79] = OP_ADC_ABS_Y;
-    // opcode_table[0x89] = ;
+    // opcode_table[0x89] = ; NO OPCODE HERE ON CLASSIC 6502
     opcode_table[0x99] = OP_STA_ABS_Y;
     opcode_table[0xA9] = OP_LDA_IMM;
     opcode_table[0xB9] = OP_LDA_ABS_Y;
@@ -308,7 +330,6 @@ void init_instruction_handler_lut()
     opcode_table[0xBA] = TSX;
     opcode_table[0xCA] = DEX;
     opcode_table[0xEA] = OP_NOOP;
-
     opcode_table[0x2C] = OP_BIT_ABS;
     opcode_table[0x4C] = OP_JMP_ABS;
     opcode_table[0x6C] = OP_JMP_IND;
@@ -349,32 +370,6 @@ void init_instruction_handler_lut()
     opcode_table[0xDE] = OP_DEC_ABS_X;
     opcode_table[0xEE] = OP_INC_ABS;
     opcode_table[0xFE] = OP_INC_ABS_X;
-}
-
-void branch()
-{
-    int8_t branch_position = (int8_t)read_pc();
-    uint32_t flag = 0;
-    inst = decode_table[opcode];
-    switch (inst.xx)
-    {
-    case 0:
-        flag = N;
-        break;
-    case 1:
-        flag = O;
-        break;
-    case 2:
-        flag = C;
-        break;
-    case 3:
-        flag = Z;
-        break;
-    }
-    if (flag == (inst.y != 0))
-    {
-        PC += branch_position;
-    }
 }
 
 // stack opperatons. remember, addresses are 16 bit wide!
@@ -433,9 +428,10 @@ uint16_t IRAM_ATTR read_address_from_pc()
     return address;
 }
 
-
 // This function runes one opcode, not one cycle. My emulator does not aim to be
 // cycle accurate CPU EXECUTE NOW DOES ONLY ONE CLOCK
+// This LOOKUP table was obtained by running estimate_duration() from my original emulator for each opcode
+// ASsuming a duration of 2 if the opcode doesnt exist
 static int DRAM_ATTR OPCODE_duration[256] = {2, 2, 2, 2, 3, 2, 2, 2, 3, 2, 2, 2, 4, 2, 2, 2, 3,
                                              2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 6, 2, 2,
                                              2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 4,
@@ -452,7 +448,9 @@ static int DRAM_ATTR OPCODE_duration[256] = {2, 2, 2, 2, 3, 2, 2, 2, 3, 2, 2, 2,
                                              2, 2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2,
                                              2, 2, 2, 2, 2};
 
-// Simplifying instruction duration calculations saves 10 ESP cycles/CPU cycle(HUGE!)
+
+
+//Maybe switch to a system interrupt when an emulated interrupt occurs, could prevent an if for every iteration - i dont know if it's worth
 uint32_t remaining_cycles = 0;
 void IRAM_ATTR cpu_clock()
 {
@@ -462,30 +460,18 @@ void IRAM_ATTR cpu_clock()
     }
     else
     {
-        cpu_execute();
+        if (!pending_nmi)
+        {
+            opcode = read_pc();
+            remaining_cycles += OPCODE_duration[opcode];
+            opcode_table[opcode]();
+        }
+        else
+        {
+            trigger_nmi();
+            remaining_cycles += 7;
+            return;
+        }
+        return; // if it gets here it means it failed
     }
-}
-
-void IRAM_ATTR cpu_execute()
-{
-    if (!pending_nmi)
-    {
-        opcode = read_pc();
-        //Serial.println(opcode);
-        inst = decode_table[opcode];
-        remaining_cycles += OPCODE_duration[opcode];
-        opcode_table[opcode]();
-    }
-    else
-    {
-        trigger_nmi();
-        remaining_cycles += 7;
-        return;
-    }
-    return; // if it gets here it means it failed
-}
-
-byte IRAM_ATTR ram_at(uint16_t address)
-{
-    return cpu_read(address);
 }

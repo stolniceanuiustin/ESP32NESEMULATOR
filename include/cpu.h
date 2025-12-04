@@ -22,16 +22,12 @@ struct Instruction
     byte y;
 };
 
-extern struct Instruction inst;
+// CPU internal registers
 extern byte A;
 extern byte X;
 extern byte Y;
 extern uint16_t PC;
-extern byte SP; // Stack pointer
-extern uint32_t cycles;
-extern int32_t estimated_cycles;
-extern uint32_t elapsed_cycles;
-// extern byte opcode;
+extern byte SP; // Stack pointer - Stack is in RAM
 // Cpu Flags
 extern byte C; // carry
 extern byte Z; // zero
@@ -44,9 +40,31 @@ extern byte N; // negative
 void cpu_init();
 void cpu_reset();
 
-byte ram_at(uint16_t address);
-byte pack_flags();
-void unpack_flags(byte flags);
+byte inline pack_flags()
+{
+    byte to_return = 0;
+    to_return |= N << 7;
+    to_return |= O << 6;
+    to_return |= 1 << 5;
+    to_return |= B << 4;
+    to_return |= D << 3;
+    to_return |= I << 2;
+    to_return |= Z << 1;
+    to_return |= C;
+
+    return to_return;
+};
+void inline unpack_flags(byte flags)
+{
+    N = ((1 << 7) & flags) >> 7;
+    O = ((1 << 6) & flags) >> 6;
+    B = 0; // break flag shouldnt change when loded with PLP
+    D = ((1 << 3) & flags) >> 3;
+    I = ((1 << 2) & flags) >> 2;
+    Z = ((1 << 1) & flags) >> 1;
+    C = 1 & flags;
+    return;
+}
 CPU_VARS pack_vars();
 // byte read_pc();
 inline byte read(uint16_t address) { return cpu_read(address); }
@@ -60,7 +78,7 @@ byte inline read_pc()
 uint16_t read_address_from_pc();
 uint16_t read_address(byte offset);
 
-//extern CPU_STATE state;
+// extern CPU_STATE state;
 void fetch_instruction();
 void cpu_clock();
 void cpu_execute();
@@ -155,6 +173,16 @@ void RTS();
 void RTI();
 void JSR_abs(uint16_t address);
 
+// BRANCHES
+void OP_BPL();
+void OP_BMI();
+void OP_BVC();
+void OP_BVS();
+void OP_BCC();
+void OP_BCS();
+void OP_BNE();
+void OP_BEQ();
+
 const uint16_t NMI_vector = 0xFFFA;
 const uint16_t RESET_VECTOR = 0xFFFC;
 const uint16_t IRQ_vector = 0xFFFE;
@@ -170,8 +198,7 @@ inline void enqueue_nmi()
     pending_nmi = true;
 }
 
-
-//addressing modes
+// addressing modes
 uint16_t addr_IMM(void);
 uint16_t addr_zero_page_x_p(void);
 uint16_t addr_zero_page_x(void);
@@ -181,6 +208,5 @@ uint16_t addr_abs(void);
 uint16_t addr_pzero_page_y(void);
 uint16_t addr_abs_y(void);
 uint16_t addr_abs_x(void);
-
 
 #endif

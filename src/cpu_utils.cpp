@@ -16,7 +16,6 @@ void cpu_init()
     PC = read_abs_address(RESET_VECTOR);
     pending_nmi = false;
     init_instruction_handler_lut();
-    build_decode_table();
 }
 void cpu_reset()
 {
@@ -24,7 +23,7 @@ void cpu_reset()
     X = 0;
     Y = 0;
     SP = 0xFD; // it decreases with pushing
-    PC = read_abs_address(RESET_VECTOR);
+    PC = read_abs_address(RESET_VECTOR); 
     C = 0; // carry
     Z = 0; // zero
     I = 1;
@@ -33,10 +32,6 @@ void cpu_reset()
     O = 0;
     N = 0;
     bus_reset();
-    cycles = 0;
-    elapsed_cycles = 0;
-    estimated_cycles = 0;
     init_instruction_handler_lut();
-    build_decode_table();
 }
 

@@ -153,9 +153,10 @@ void IRAM_ATTR ppu_write(uint16_t addr, uint8_t data)
     }
     else if (addr >= 0x0000 && addr <= 0x1FFF)
     {
+        // This should just get ignored, as some games attempt to write here for some reason.
         // Mapper0 games dont write to this zone
         // ppu_write(addr, data);
-        Serial.println("========Writing to cartridge ROM. should not get here in normal circumstances!!!!=======");
+        //Serial.println("========Writing to cartridge ROM. should not get here in normal circumstances!!!!=======");
     }
 }
 
@@ -336,6 +337,7 @@ void IRAM_ATTR ppu_render_scanline()
         status.sprite_zero_hit = 0;
         std::memset(sp_pattern_h, 0, 8);
         std::memset(sp_pattern_l, 0, 8);
+        transfer_address_y();
     }
     else if (scanline >= 0 && scanline < 240)
     {
