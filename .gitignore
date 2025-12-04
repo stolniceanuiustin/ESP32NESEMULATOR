@@ -10,3 +10,4 @@ data/*.bin
 data/*.nes
 .clangd
 .cache/*
+.vscode
