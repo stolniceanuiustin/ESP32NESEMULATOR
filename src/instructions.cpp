@@ -403,6 +403,7 @@ void IRAM_ATTR INY()
 {
     Y = Y + 1;
     set_ZN(Y);
+    //N = 1;
 }
 
 void IRAM_ATTR INX()
@@ -522,8 +523,8 @@ void IRAM_ATTR trigger_irq()
 {
     if (I == 0) // interrupts enabled
     {
-        SP = 0xFD;
-        push_address(PC);
+        //SP = 0xFD;
+        //push_address(PC);
         push((PC & 0xFF00) >> 8);
         push((PC & 0x00FF));
         push(pack_flags());
@@ -536,15 +537,26 @@ void IRAM_ATTR trigger_irq()
 void IRAM_ATTR trigger_nmi()
 { // STACK STARTS AT 0xFD
     // std::cout << "===============NMI TRIGGERED===============\n";
-    SP = 0xFD;
+    //SP = 0xFD;
     push_address(PC);
     push(pack_flags());
     PC = read_abs_address(NMI_vector);
-    I = 1;
+    //I = 1;
     // TODO check if this was an issue
     pending_nmi = false;
 }
 
+// void IRAM_ATTR trigger_nmi()
+// {
+//     // push((PC >> 8) & 0xFF);
+//     // push(PC & 0xFF);
+//     // uint8_t flags = pack_flags();
+//     // push(flags);
+
+//     // PC = read_abs_address(NMI_vector);
+
+//     pending_nmi = false;
+// }
 void IRAM_ATTR RTI()
 {
     byte flags = pop();

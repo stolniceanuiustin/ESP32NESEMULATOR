@@ -24,12 +24,13 @@ struct _OAM
 
 extern union PPUStatus
 {
+    //Changed ORDER because endiness on ESP32 is backwards
     struct
     {
-        byte unused : 5;
-        byte sprite_overflow : 1;
-        byte sprite_zero_hit : 1;
-        byte vertical_blank : 1;
+        uint8_t unused : 5;          
+        uint8_t sprite_overflow : 1; 
+        uint8_t sprite_zero_hit : 1; 
+        uint8_t vertical_blank : 1;  
     };
     byte reg;
 } status;

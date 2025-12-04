@@ -21,7 +21,6 @@ const uint16_t null_address = 0;
 // All instructions are explained here: https://www.masswerk.at/6502/6502_instruction_set.html
 // For a better understanding of how the CPU works, check this awesome resource: https://www.nesdev.org/obelisk-6502-guide/
 
-
 void OP_NOOP() {};
 void OP_BRK() { BRK(); };
 void OP_BPL()
@@ -30,6 +29,7 @@ void OP_BPL()
     if (N == 0)
         PC += branch_position;
 };
+
 void OP_JSR()
 {
     uint16_t address = read_abs_address(PC);
@@ -107,7 +107,7 @@ void OP_STY_ZP_X() { STY(addr_zero_page_x()); };
 void OP_LDY_ZP() { LDY(addr_zero_page()); };
 void OP_LDY_ZP_X() { LDY(addr_zero_page_x()); };
 void OP_CPY_ZP() { CPY(addr_zero_page()); };
-void OP_CPX_ZP() { CPX(addr_zero_page_x()); };
+void OP_CPX_ZP() { CPX(addr_zero_page()); };
 void OP_ORA_ZP() { ORA(addr_zero_page()); };
 void OP_ORA_ZP_X() { ORA(addr_zero_page_x()); };
 void OP_AND_ZP() { AND(addr_zero_page()); };
@@ -380,6 +380,7 @@ void IRAM_ATTR push(byte x)
     SP--;
 }
 
+//This maybe was the rooot of all my problems?
 void push_address(uint16_t address)
 {
     cpu_write(0x0100 + SP, (address & 0xFF00) >> 8);
@@ -448,10 +449,9 @@ static int DRAM_ATTR OPCODE_duration[256] = {2, 2, 2, 2, 3, 2, 2, 2, 3, 2, 2, 2,
                                              2, 2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2,
                                              2, 2, 2, 2, 2};
 
-
-
-//Maybe switch to a system interrupt when an emulated interrupt occurs, could prevent an if for every iteration - i dont know if it's worth
+// Maybe switch to a system interrupt when an emulated interrupt occurs, could prevent an if for every iteration - i dont know if it's worth
 uint32_t remaining_cycles = 0;
+uint32_t debug_count = 0;
 void IRAM_ATTR cpu_clock()
 {
     if (remaining_cycles)
@@ -460,9 +460,14 @@ void IRAM_ATTR cpu_clock()
     }
     else
     {
+        debug_count++;
         if (!pending_nmi)
         {
             opcode = read_pc();
+            if (cpu_debug_print)
+            {
+                Serial.printf("Opcode: %02X, PC: %04X | A:%02X X:%02X Y:%02X\n", opcode, PC, A, X, Y);
+            }
             remaining_cycles += OPCODE_duration[opcode];
             opcode_table[opcode]();
         }

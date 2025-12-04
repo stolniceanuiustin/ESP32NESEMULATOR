@@ -76,7 +76,6 @@ bool cartridge_read_file(char* rom_name)
     if (mapper_type == 0)
     {
         Serial.println("Using mappertype 0");
-        // p_mapper = std::make_shared<Mapper0>(header.prg_size, header.chr_size);
         int prg_size = header.prg_size * PRG_BANK_SIZE;
         int chr_size = header.chr_size * CHR_BANK_SIZE;
 

@@ -100,6 +100,7 @@ inline void bus_clock_t()
             dma_phase = !dma_phase;
         }
     }
+    
     // end_cycles_d = xthal_get_ccount();
     // uint32_t my_cycles = end_cycles_d - start_cycles_d;
     // cpu_cycles_cnt += 113;
@@ -130,7 +131,7 @@ void setup()
     tft.fillScreen(TFT_BLACK);
 
     // Reads GAME from Cartridge and loads it into RAM
-    if (!cartridge_read_file("/smb.bin"))
+    if (!cartridge_read_file("/Pacman.nes"))
         exit(-1);
 
     Serial.println("READ FILE SUCCESFULLY\n");
@@ -196,6 +197,9 @@ void loop()
         if (gamepad.buttonIsPressed("CROSS")) // SDLK_x  = 0x80
             controller_input_buffer |= 0x80;
 
+        if(gamepad.buttonIsPressed("TRIANGLE"))
+            cpu_debug_print = !cpu_debug_print;
+
         //=====IF CONTROLLER NOT WORKING ,UNCOMMENT THIS AND SEE INPUT_BUFFER IN REAL TIME!
         // Serial.println(controller_input_buffer);
         // Serial.println("Frame rendered");
@@ -210,7 +214,7 @@ void IRAM_ATTR Core0Loop(void *parameter)
     for (;;)
     {
 
-        for (int i = 0; i <= 5000; i++)
+        for (int i = 0; i <= 500; i++)
         {
             //            start_cycles_d = xthal_get_ccount();
             bus_clock_t();
@@ -218,6 +222,7 @@ void IRAM_ATTR Core0Loop(void *parameter)
             // uint32_t my_cycles = end_cycles_d - start_cycles_d;
             // Serial.printf("On average %u ESP cycles/NES Scanline\n", my_cycles);
         }
+        
         //Serial.printf("On average %u ESP cycles/CPU Cycle\n", cpu_cycles_avg / cpu_cycles_cnt);
         // Serial.printf("On average %u ESP cycles/Scanline\n", scanline_avg / 5000);
         vTaskDelay(1); // keep the watchdog happy!

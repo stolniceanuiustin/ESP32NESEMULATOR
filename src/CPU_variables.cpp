@@ -8,7 +8,7 @@ byte X = 0x00;
 byte Y = 0x00;
 uint16_t PC = 0x0000;
 byte SP = 0xFD; 
-
+uint32_t cpu_debug_print = 0;
 uint32_t opcode = 0;
 
 uint32_t cycles = 0;

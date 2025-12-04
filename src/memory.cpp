@@ -1,7 +1,8 @@
 #include "memory.h"
-
+//*** This file has the implementation for ALL the memory related functions.*** 
 
 // TODO : When Emulator reaches 60 fps, implement Mappers
+
 byte cpu_read(uint16_t addr)
 {
     if (addr >= 0x8000 && addr <= 0xFFFF)
@@ -9,7 +10,8 @@ byte cpu_read(uint16_t addr)
         // uint16_t mapped_addr = p_mapper->cpu_map_read(addr);
         // return PRGrom[mapped_addr];
         //hardcoding mapper0. 
-        return PRGrom[addr & (0x7FFF)]; 
+        //Serial.println(prg_banks_cnt);
+        return PRGrom[addr & 0x7FFF];
     }
     if (addr >= 0x0000 && addr <= 0x1FFF)
     {

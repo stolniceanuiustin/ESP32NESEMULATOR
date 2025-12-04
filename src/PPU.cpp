@@ -172,6 +172,9 @@ byte IRAM_ATTR ppu_read_from_cpu(byte addr)
     case 2:
         // TODO: CHECK THIS
         data = (status.reg & 0b11100000) | (PPU_BUFFER & 0b00011111); // last 5 bits of the last ppu bus transaction
+        // if (status.vertical_blank) {
+        //     Serial.printf("CPU reading $2002. Reg value: 0x%02X\n", status.reg);
+        // }   
         // i think clearing vblank is messing up with timing!
         clear_vblank();
         PPUADDR_latch = false;
@@ -341,6 +344,7 @@ void IRAM_ATTR ppu_render_scanline()
     }
     else if (scanline >= 0 && scanline < 240)
     {
+        //Serial.printf("Scanline nr: %d\n", scanline);
         // ON real hardware this is done at dot 257 but we do it at the beginning
         transfer_address_x();
         vaddr = build_background_scanline(scanline, vaddr, fine_x);
