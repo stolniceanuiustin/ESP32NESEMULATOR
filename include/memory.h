@@ -10,6 +10,7 @@
 
 typedef uint8_t byte;
 
+void memory_init();
 
 
 extern byte PRGrom[0x8000];

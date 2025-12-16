@@ -16,6 +16,8 @@
 typedef uint8_t byte;
 
 TFT_eSPI tft = TFT_eSPI();
+// An amazing resource for hooking up PS2 controllers to other devices
+// http://www.billporter.info/2010/06/05/playstation-2-controller-arduino-library-v1-0/
 #define PS2_DAT 40
 #define PS2_CMD 39
 #define PS2_ATT 38
@@ -41,64 +43,36 @@ uint8_t div3 = 0;
 bool dma_phase = false;
 
 /*
-It Took 100 ESP Cycles/CPU Cycle on average! 
-It now takes 80 ESP Cycles/CPU Cycle on average, after changing the CPU core to be more efficient - and less readable. 
+It took 80 ESP Cycles/CPU Cycle on average, after changing the CPU core to be more efficient - and less readable. 
+It now takes 69-70 ESP cycles/CPU cycle but DMA is done separately and not meassured here. 
+It seems that the CPU is no longer the bottleneck.
 
-It takes around ~566952 ESP cycles / scanline rendered! => More than half the CPU time is taken by PPU rendering, which is ok.
+
+It takes around ~47695 ESP cycles / scanline rendered! => More than half the (ESP32S3's) CPU time is taken by PPU rendering, which is ok.
 if i get the CPU emulation to take only the other half of the CPU time, then this can run in 60FPS;
 */
 
 // Rendering scanline then running the cpu works as most interaction between CPU and PPU happens during vblank, when the PPU is doing nothing
-// This may cause small glitches as CPU can stop mid execution of an instruction. Remember, the CPU is not emulated
-// CYCLE-perfect, in the sense that when it fetches an instruction it calculates how long it would take, wait for that ammount ofcycles and then
-// run the instruction.
+// This may cause small glitches as CPU can stop mid execution of an instruction. Remember, the emulator is NOT
+// CYCLE-perfect and it doesn't aim to be on such a platform!
+
 uint64_t cpu_cycles_avg = 0;
 uint32_t cpu_cycles_cnt = 0;
 uint32_t scanline_avg = 0;
+
+
 inline void bus_clock_t()
 {
-    // start_cycles_d = xthal_get_ccount();
+//    start_cycles_d = xthal_get_ccount();
     ppu_render_scanline();
     // end_cycles_d = xthal_get_ccount();
     // scanline_avg += end_cycles_d - start_cycles_d;
-    // it should go from (0, 341/3) but since 341/3 = 113.66666, we round to 113. Rounding to 114 causes a small glitch on the
-    // scanline when sprite0 hit happens ()
-    //start_cycles_d = xthal_get_ccount();
+    // // it should go from (0, 341/3) but since 341/3 = 113.66666, we round to 113. Rounding to 114 causes a small glitch on the
+    // // scanline when sprite0 hit happens ()
+    // start_cycles_d = xthal_get_ccount();
     for (int i = 0; i < 113; i++)
     {
-        if (!dma_transfer)
-        {
-            cpu_clock();
-        }
-        else
-        {
-            if (dma_first_clock)
-            {
-                if (dma_phase == false)
-                {
-                    dma_first_clock = false;
-                }
-            }
-            else
-            {
-                if (dma_phase == true)
-                {
-                    oam_dma_data = cpu_read((oam_dma_page << 8) | oam_dma_addr);
-                }
-                else
-                {
-                    pOAM[oam_dma_addr] = oam_dma_data;
-                    oam_dma_addr++;
-                    if (oam_dma_addr == 0x00)
-                    {
-                        dma_transfer = false;
-                        dma_first_clock = true;
-                    }
-                }
-            }
-
-            dma_phase = !dma_phase;
-        }
+        cpu_clock();
     }
     
     // end_cycles_d = xthal_get_ccount();
@@ -131,17 +105,18 @@ void setup()
     tft.fillScreen(TFT_BLACK);
 
     // Reads GAME from Cartridge and loads it into RAM
-    if (!cartridge_read_file("/Pacman.nes"))
+    if (!cartridge_read_file("/smb.bin"))
         exit(-1);
 
     Serial.println("READ FILE SUCCESFULLY\n");
 
-    // This initializes the eulator!
+    // This initializes the emulator (obviously!)
     screen_init();
     bus_init();
     cpu_init();
     cpu_reset();
     ppu_init();
+    
     uint32_t frames = 0;
 
     xTaskCreatePinnedToCore(Core0Loop, "Core0Loop", 10000, NULL, configMAX_PRIORITIES - 1, &Core0Task, 0);
@@ -223,8 +198,9 @@ void IRAM_ATTR Core0Loop(void *parameter)
             // Serial.printf("On average %u ESP cycles/NES Scanline\n", my_cycles);
         }
         
-        //Serial.printf("On average %u ESP cycles/CPU Cycle\n", cpu_cycles_avg / cpu_cycles_cnt);
-        // Serial.printf("On average %u ESP cycles/Scanline\n", scanline_avg / 5000);
+        // Serial.printf("On average %u ESP cycles/CPU Cycle\n", cpu_cycles_avg / cpu_cycles_cnt);
+        // Serial.printf("On average %u ESP cycles/Scanline\n", scanline_avg / 500);
+        //scanline_avg = 0;
         vTaskDelay(1); // keep the watchdog happy!
     }
 }

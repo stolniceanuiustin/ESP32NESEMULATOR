@@ -1,25 +1,32 @@
 #include "memory.h"
+#define LIKELY(x)   (__builtin_expect(!!(x), 1))
+#define UNLIKELY(x) (__builtin_expect(!!(x), 0))
+
+// From my understanding, there macros should help the branch predictor.
+// But from my profiling it doesn't seem to be that big of a deal. 
+//
 //*** This file has the implementation for ALL the memory related functions.*** 
 
 // TODO : When Emulator reaches 60 fps, implement Mappers
 
 byte cpu_read(uint16_t addr)
 {
-    if (addr >= 0x8000 && addr <= 0xFFFF)
+    if (LIKELY(addr >= 0x8000))
     {
         // uint16_t mapped_addr = p_mapper->cpu_map_read(addr);
         // return PRGrom[mapped_addr];
-        //hardcoding mapper0. 
+        // hardcoding mapper0. 
         //Serial.println(prg_banks_cnt);
         return PRGrom[addr & 0x7FFF];
     }
-    if (addr >= 0x0000 && addr <= 0x1FFF)
+    else if (LIKELY(addr <= 0x1FFF))
     {
         return CPUram[addr & 0x07FF];
     }
-    else if (addr >= 0x2000 && addr <= 0x3FFF)
+    else if (UNLIKELY(addr >= 0x2000 && addr <= 0x3FFF))
     {
-        byte data = ppu_read_from_cpu(addr & 0x0007);
+        // Let's assume for now that the CPU only addresses the registers via their real address and not via mirroring
+        byte data = ppu_read_from_cpu(addr /*& 0x0007*/);
         return data;
     }
     else if (addr >= 0x4000 && addr <= 0x4015)
@@ -56,9 +63,13 @@ void cpu_write(uint16_t addr, byte data)
     }
     else if (addr == 0x4014) // OAMDMA
     {
-        oam_dma_page = data;
-        oam_dma_addr = 0x00;
-        dma_transfer = true;
+        // oam_dma_page = data;
+        // oam_dma_addr = 0x00;
+        // dma_transfer = true;
+        uint16_t dma_start_addr = (uint16_t)data << 8;
+        memcpy(pOAM, &CPUram[dma_start_addr], 256);
+        extern uint32_t remaining_cycles;
+        remaining_cycles += 513;
     }
     else if (addr == 0x4016 || addr == 0x4017)
     {

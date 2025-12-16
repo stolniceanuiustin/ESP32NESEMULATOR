@@ -156,7 +156,7 @@ void IRAM_ATTR ppu_write(uint16_t addr, uint8_t data)
         // This should just get ignored, as some games attempt to write here for some reason.
         // Mapper0 games dont write to this zone
         // ppu_write(addr, data);
-        //Serial.println("========Writing to cartridge ROM. should not get here in normal circumstances!!!!=======");
+        // Serial.println("========Writing to cartridge ROM. should not get here in normal circumstances!!!!=======");
     }
 }
 
@@ -174,7 +174,7 @@ byte IRAM_ATTR ppu_read_from_cpu(byte addr)
         data = (status.reg & 0b11100000) | (PPU_BUFFER & 0b00011111); // last 5 bits of the last ppu bus transaction
         // if (status.vertical_blank) {
         //     Serial.printf("CPU reading $2002. Reg value: 0x%02X\n", status.reg);
-        // }   
+        // }
         // i think clearing vblank is messing up with timing!
         clear_vblank();
         PPUADDR_latch = false;
@@ -290,20 +290,21 @@ loopy IRAM_ATTR build_background_scanline(int scanline_index, loopy vaddr_snapsh
         for (int px = 0; px < 8; px++)
         {
             int out_x = dest_x + px;
+
+            byte attr_coarse_x = tx >> 2;
+            byte attr_coarse_y = coarse_y >> 2;
+            // TODO: maybe bitwise nt_y and tx with 1?
+            // ppu_read(0x23C0 | (vaddr.nametable_y << 11) | (vaddr.nametable_x << 10) | ((vaddr.coarse_y >> 2) << 3) | (vaddr.coarse_x >> 2));
+            uint16_t attr_addr = 0x23C0 | (nt_y << 11) | (ntx << 10) | (attr_coarse_y << 3) | (attr_coarse_x);
+            byte attr_byte = ppu_read(attr_addr);
+
+            byte shift = ((coarse_y & 2) ? 4 : 0) + ((tx & 2) ? 2 : 0);
+            byte pallete_high = (attr_byte >> shift) & 0x03;
+
             if (out_x >= 0 && out_x < 256)
             {
                 // this only contains pallet index, no attribute data
                 byte pixel = tile_pixels[pattern_index][fine_y][px];
-
-                byte attr_coarse_x = tx >> 2;
-                byte attr_coarse_y = coarse_y >> 2;
-                // TODO: maybe bitwise nt_y and tx with 1?
-                // ppu_read(0x23C0 | (vaddr.nametable_y << 11) | (vaddr.nametable_x << 10) | ((vaddr.coarse_y >> 2) << 3) | (vaddr.coarse_x >> 2));
-                uint16_t attr_addr = 0x23C0 | (nt_y << 11) | (ntx << 10) | (attr_coarse_y << 3) | (attr_coarse_x);
-                byte attr_byte = ppu_read(attr_addr);
-
-                byte shift = ((coarse_y & 2) ? 4 : 0) + ((tx & 2) ? 2 : 0);
-                byte pallete_high = (attr_byte >> shift) & 0x03;
 
                 byte combined = (pallete_high << 2) | (pixel & 0x03);
 
@@ -344,8 +345,8 @@ void IRAM_ATTR ppu_render_scanline()
     }
     else if (scanline >= 0 && scanline < 240)
     {
-        //Serial.printf("Scanline nr: %d\n", scanline);
-        // ON real hardware this is done at dot 257 but we do it at the beginning
+        // Serial.printf("Scanline nr: %d\n", scanline);
+        //  ON real hardware this is done at dot 257 but we do it at the beginning
         transfer_address_x();
         vaddr = build_background_scanline(scanline, vaddr, fine_x);
 
@@ -461,6 +462,7 @@ void IRAM_ATTR ppu_render_scanline()
 
                                 if (i == 0 && sprite_zero_on_scanline)
                                     sprite_zero_is_rendering = true;
+                                break;
                             }
                         }
                     }
@@ -503,7 +505,9 @@ void IRAM_ATTR ppu_render_scanline()
             byte color = 0;
             if (pixel != 0)
             {
-                color = ppu_read(0x3F00 + (pallete << 2) + pixel) & 0x3F;
+                // Old way :
+                //color = ppu_read(0x3F00 + (pallete << 2) + pixel) & 0x3F;
+                color = pallete_table[(pallete << 2) | pixel] & 0x3F;
             }
             else
                 color = transparent_pixel_color;
@@ -534,6 +538,7 @@ void IRAM_ATTR ppu_render_scanline()
     }
     return;
 }
+/*
 void IRAM_ATTR ppu_execute()
 {
     if (scanline == -1)
@@ -653,14 +658,14 @@ void IRAM_ATTR ppu_execute()
                         for (int i = 0; i < sprite_cnt; i++)
                         {
                             int sx = sprites_on_scanline[i].x;
-                            if (x >= sx && x < sx + 8)
+                            if ((uint32_t)(x - sx) < 8)
                             {
                                 int diff_x = x - sx;
 
                                 int bit = 7 - diff_x;
 
-                                byte pixel_bit = ((sp_pattern_h[i] >> bit) & 1) << 1 | ((sp_pattern_l[i] >> bit) & 1);
-
+                                byte temp_mask = 0x80 >> diff_x;
+                                byte pixel_bit = ((sp_pattern_h[i] & temp_mask) ? 2 : 0) | ((sp_pattern_l[i] & temp_mask) ? 1 : 0);
                                 if (pixel_bit != 0)
                                 {
                                     fg_pixel = pixel_bit;
@@ -669,6 +674,8 @@ void IRAM_ATTR ppu_execute()
 
                                     if (i == 0 && sprite_zero_on_scanline)
                                         sprite_zero_is_rendering = true;
+
+                                    // break;
                                 }
                             }
                         }
@@ -712,6 +719,7 @@ void IRAM_ATTR ppu_execute()
                 if (pixel != 0)
                 {
                     color = ppu_read(0x3F00 + (pallete << 2) + pixel) & 0x3F;
+                    // color = pallete_table[(pallete << 2) + pixel] & 0x3F; // ppu_read(0x3F00 + (pallete << 2) + pixel) & 0x3F;
                 }
                 else
                     color = transparent_pixel_color;
@@ -743,7 +751,7 @@ void IRAM_ATTR ppu_execute()
             RENDER_ENABLED = true;
         }
     }
-}
+}*/
 
 // HELPER FUNCTIONS
 byte flip_byte_fn(byte x)
