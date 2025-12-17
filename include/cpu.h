@@ -8,7 +8,6 @@
 
 typedef uint8_t byte;
 typedef void (*InstructionHandler)(void);
-static InstructionHandler opcode_table[256];
 void init_instruction_handler_lut();
 void build_decode_table();
 extern uint32_t opcode;

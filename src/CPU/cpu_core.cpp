@@ -17,6 +17,7 @@ using std::cout;
 typedef void (*cpu_op_fn)(uint16_t address);
 typedef void (*cpu_op_fn_acc)();
 const uint16_t null_address = 0;
+static InstructionHandler opcode_table[256];
 
 // All instructions are explained here: https://www.masswerk.at/6502/6502_instruction_set.html
 // For a better understanding of how the CPU works, check this awesome resource: https://www.nesdev.org/obelisk-6502-guide/

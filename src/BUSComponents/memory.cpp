@@ -1,12 +1,13 @@
 #include "memory.h"
+
 // From my understanding, there macros should help the branch predictor.
-// But from my profiling it doesn't seem to be that big of a deal. 
+// But from my profiling it doesn't seem to be make any difference. From what i read this is dependant on the platform you run the code on.
 #define LIKELY(x)   (__builtin_expect(!!(x), 1))
 #define UNLIKELY(x) (__builtin_expect(!!(x), 0))
 
 
 
-//*** This file has the implementation for ALL the memory related functions.*** 
+// This file has the implementation for ALL the memory related functions.
 
 // TODO : When Emulator reaches 60 fps, implement Mappers
 
@@ -22,19 +23,23 @@ byte cpu_read(uint16_t addr)
     }
     else if (UNLIKELY(addr >= 0x2000 && addr <= 0x3FFF))
     {
-        // Let's assume for now that the CPU only addresses the registers via their real address and not via mirroring
-        byte data = ppu_read_from_cpu(addr /*& 0x0007*/);
+        byte data = ppu_read_from_cpu(addr & 0x0007);
         return data;
     }
-    else if (addr >= 0x4000 && addr <= 0x4015)
+    else if (UNLIKELY(addr >= 0x4000 && addr <= 0x4015))
     {
+        // Those are Audio Registers. Not yet implemented!
         return 0;
     }
-    else if (addr == 0x4016 || addr == 0x4017)
+    else if (UNLIKELY(addr == 0x4016 || addr == 0x4017))
     {
+        // This is, in reality, a shift register. Every time the cpu reads this, it only gets one byte 
+        // The cpu might read 8 times in a row, and you get the buttons in this order:
+        // A, B, Select, Start, Up, Down, Left, Right
+        // Fun Fact: they made it that way so the controller could only have 5 pins - VCC, GND, Latch, Clock and Data
         byte data = (controller_state[addr & 1] & 0x80) > 0 ? 1 : 0;
         controller_state[addr & 1] <<= 1;
-        return data; // bit 6 shjould always be set to 1 due to open bus behaviour
+        return data; 
     }
     else
         return 0;
@@ -50,17 +55,21 @@ void cpu_write(uint16_t addr, byte data)
     {
         CPUram[addr& 0x07FF] = data;
     }
-    else if (addr >= 0x2000 && addr <= 0x3FFF) // those are the PPU registers mirrored every 8 bites
+    else if (addr >= 0x2000 && addr <= 0x3FFF) 
     {
-        ppu_write_from_cpu(addr /*& 0x0007*/, data);    // We asume the CPU only writes to 2000, 2001, 2002..2007 and not any of the mirrored addresses
+        ppu_write_from_cpu(addr & 0x0007, data);    
     }
     else if (addr >= 0x4000 && addr <= 0x4013)
     {
-        // std::cerr << "APU REGISTERS\n";
+        // Those are 
     }
     else if (addr == 0x4014) // OAMDMA
     {
+        // Writing in this register triggers a DMA between ram and the PPU object attribute memory
+        // A DMA here is really just a Blocking Burst Transfer, as 
         // This is no longer cycle accurate but we make that tradeoff for better performance
+        // Worst case, we drift one cycle away.
+
         uint16_t dma_start_addr = (uint16_t)data << 8;
         memcpy(pOAM, &CPUram[dma_start_addr], 256);
         extern uint32_t remaining_cycles;
