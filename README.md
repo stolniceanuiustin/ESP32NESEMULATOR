@@ -1,8 +1,8 @@
 ## NES Emulator on ESP32 - A project of mine 
 I developed a functional emulator for the Nintendo Entertainment System (NES), allowing original games (ROMs) to run on an ESP32s3.   
 This is a port of my original NESEmulator, which was designed for x86.  
-Currently, it runs at 20 FPS.  
-The CPU emulation is cycle accurate, while the PPU renders everything on a scanline at once.  
+Currently, it runs Super Mario Bros at a "cinematic", but not real time yet, 24 FPS. 
+The CPU emulation is (almost) cycle accurate, while the PPU renders everything on a scanline at once.  
 
 ## Implemented MAPPERS:
 Unfortunetly, the only mapper implemented for now is MAPPER0, and it is hardcoded, as i tried to eliminate as much C++ overhead as possbile.  
