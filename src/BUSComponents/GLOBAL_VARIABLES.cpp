@@ -102,8 +102,6 @@ bool DRAM_ATTR sprite_zero_on_scanline = false;
 bool DRAM_ATTR sprite_zero_is_rendering = false;
 
 byte DRAM_ATTR flip_byte[256] = {0};
-byte DRAM_ATTR tile_fetch_phase = 0;
-
 byte transparent_pixel_color = 0;
 byte scanline_buffer[256] = {0};
 byte tile_pixels[512][8][8] = {0};

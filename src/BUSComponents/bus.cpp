@@ -26,7 +26,8 @@ void bus_reset()
 
 
 
-// This is the old function that clocked the whole system. Its a legacy function ported from my x86 emulator but it should not be used here
+// This is the old function that clocked the whole system.
+// Its a legacy function ported from my x86 emulator but it should not be used here
 void bus_clock()
 {
     ppu_execute();

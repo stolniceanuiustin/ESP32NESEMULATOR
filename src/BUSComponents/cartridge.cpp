@@ -1,14 +1,9 @@
-#include "cartridge.h"
 #include <Arduino.h>
 #include <LittleFS.h>
 #include "memory.h"
+#include "cartridge.h"
 // Nametable_Map definition assumed to be in mapper.h or cartridge.h
 Nametable_Map nametablee;
-
-
-#include "cartridge.h"
-
-
 Config config;
 MIRROR mirroring;
 

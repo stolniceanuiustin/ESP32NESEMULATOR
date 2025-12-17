@@ -24,7 +24,6 @@ struct _OAM
 
 extern union PPUStatus
 {
-    //Changed ORDER because endiness on ESP32 is backwards
     struct
     {
         uint8_t unused : 5;          
@@ -93,7 +92,7 @@ extern loopy vaddr;
 extern loopy taddr; 
 // During rendering it does something. Outsdie of rendering, holds the VRAM address before transfering it to v
 extern uint16_t x; 
-// FINE x position of the current scroll, sused during rendering alongside v
+// FINE x position of the current scroll, used during rendering alongside v
 extern uint16_t w; 
 // Togles on each write to PPUSCROLL or PPUADDR, indicating whether it's the first or secnon dwrite. Clears on reads of PPUSTATUS
 // its also claled the write latch or write toggle
@@ -113,9 +112,6 @@ extern byte PPU_BUFFER;
 extern bool even_frame;
 extern _OAM OAM[64];
 extern byte *pOAM; // pointer to OAM for byte by byte access
-
-extern byte tile_fetch_phase;
-// TODO: here you can enable/disable ppu logging
 void ppu_init();
 
 
@@ -127,13 +123,11 @@ extern byte nametable[2][0x0400]; // mirrored
 extern byte patterntable[2][0x1000];
 extern byte pallete_table[32];
 extern byte fine_x; // 3 bits wide! ONLY 3 BIT WIDE
+
 // rendering shift registers! they shift every PPU clock. There are 2 16bit registers
 // https://www.nesdev.org/wiki/PPU_rendering
-// Conceptually:
-// Pixels that are being drawn currently
-// So we always load only the last 8 bits of the register
-// msb xxxx-xxxx                            xxxx-xxxx
-// lsb xxxx-xxxx                            xxxx-xxxx
+
+
 // BACKGROUND RENDEERING
 extern uint16_t bgs_pattern_l;
 extern uint16_t bgs_pattern_h;
@@ -147,7 +141,7 @@ extern byte bg_next_tile_msb;
 // FOREGROUND RENDERING
 extern _OAM sprites_on_scanline[8]; // only 8 sprites per scanline
 extern byte sprite_cnt;
-extern byte sp_pattern_l[8];
+extern byte sp_pattern_l[8];        // Every sprite pattern is made of 16 bits
 extern byte sp_pattern_h[8];
 extern bool sprite_zero_on_scanline;
 extern bool sprite_zero_is_rendering;
@@ -168,8 +162,6 @@ void ppu_write_from_cpu(byte addr, byte data);
 
 byte ppu_read(uint16_t addr);
 void ppu_write(uint16_t addr, byte data);
-// LOG ppu_log;
-void hexdump();
 
 // PPU Helper functions and variables
 extern byte flip_byte[256];
@@ -185,9 +177,11 @@ inline void increment_scroll_x();
 inline void increment_scroll_y();
 inline void transfer_address_y();
 
-// void memset_loop_unrolled(); //This is specifically for PPU
+
 void init_sprites_on_scanline();
 loopy build_background_scanline(int scanline_index, loopy vaddr_snapshot, byte fine_x_snapshot);
+
+// Unused. PPU used to be a state machine, now it just renders scanline by scanline 
 enum State
 {
     PRE_RENDER,

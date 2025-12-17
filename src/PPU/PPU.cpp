@@ -3,16 +3,8 @@
 #include "cpu.h"
 #include <Arduino.h>
 #include "cartridge.h"
-// THIS FILE IS MAGIC. DO NOT CHANGE ANYTHING HERE.
 
-// TODO: Remove all lambdas from this!
-
-byte *nametable_ptrs[4];
-
-void inline clear_status_register(byte &x)
-{
-    x &= 0b00011111;
-}
+static byte *nametable_ptrs[4];
 
 void ppu_init()
 {
@@ -61,28 +53,8 @@ void ppu_init()
         nametable_ptrs[3] = nametable[1];
     }
 }
-void ppu_reset()
-{
-    control.reg = 0x0000;
-    mask.reg = 0x0000;
-    status.reg = status.reg & 0b10000000;
-    PPU_BUFFER = 0;
-    PPUSCROLL_latch = false;
-    PPUADDR_latch = false;
-    first_write = false;
-    pause_after_frame = false;
-    vaddr.reg = 0x0000;
-    taddr.reg = 0x0000;
-    bgs_pattern_l = 0x0000;
-    bgs_pattern_h = 0x0000;
-    bgs_attribute_l = 0x0000;
-    bgs_attribute_h = 0x0000;
-    for (int i = 0; i < 32; i++)
-        pallete_table[i] = 0;
-}
 
-// Called very much so inline needed
-byte IRAM_ATTR ppu_read(uint16_t addr /*,bool read_only*/)
+byte IRAM_ATTR ppu_read(uint16_t addr)
 {
     addr &= 0x3FFF;
     if (addr >= 0x0000 && addr <= 0x1FFF) // reading in CHRrom(sprites usually)
@@ -90,7 +62,7 @@ byte IRAM_ATTR ppu_read(uint16_t addr /*,bool read_only*/)
         // hardcoding mapper0
         return CHRrom[addr];
     }
-    else if (addr >= 0x2000 && addr <= 0x3EFF) // reading in nametable
+    else if (addr >= 0x2000 && addr <= 0x3EFF) // reading in nametable, which is not read_only
     {
         // https://www.nesdev.org/wiki/Mirroring
 
@@ -99,7 +71,7 @@ byte IRAM_ATTR ppu_read(uint16_t addr /*,bool read_only*/)
         uint16_t offset = addr & 0x03FF; // lower 10 bits: offset inside NT
         return nametable_ptrs[nt_index][offset];
     }
-    else if (addr >= 0x3F00 /*&& addr <= 0x3FFF*/) // reading in pallete table
+    else if (addr >= 0x3F00) // reading in pallete table
     {
         addr &= 0x1F;
         if ((addr & 0x03) == 0 && (addr & 0x10) != 0)
@@ -110,17 +82,14 @@ byte IRAM_ATTR ppu_read(uint16_t addr /*,bool read_only*/)
     }
     else
     {
-        perror("PPU_read should not get here\n");
+        // The PPU should in no circumstance get here.
         return 0;
     }
 }
 
-// called very often so in line is needed
 void IRAM_ATTR ppu_write(uint16_t addr, uint8_t data)
 {
-    // Serial.println("PPU WRITE");
     addr &= 0x3FFF;
-
     if (addr >= 0x2000 && addr <= 0x3EFF)
     {
         /*
@@ -130,8 +99,9 @@ void IRAM_ATTR ppu_write(uint16_t addr, uint8_t data)
         uint8_t nt_index = addr >> 10;   // top 2 bits: 0..3
         uint16_t offset = addr & 0x03FF; // lower 10 bits: offset inside NT
         nametable_ptrs[nt_index][offset] = data;
+        return;
     }
-    else if (addr >= 0x3F00 /*&& addr <= 0x3FFF*/)
+    else if (addr >= 0x3F00)
     {
         addr &= 0x001F;
         switch (addr)
@@ -150,52 +120,53 @@ void IRAM_ATTR ppu_write(uint16_t addr, uint8_t data)
             break;
         }
         pallete_table[addr] = data;
+        return;
     }
     else if (addr >= 0x0000 && addr <= 0x1FFF)
     {
         // This should just get ignored, as some games attempt to write here for some reason.
         // Mapper0 games dont write to this zone
+        // For other mappers, the following should happen:
         // ppu_write(addr, data);
-        // Serial.println("========Writing to cartridge ROM. should not get here in normal circumstances!!!!=======");
+        return;
     }
 }
+
+// Here you can find all the registers
+// https://www.nesdev.org/wiki/PPU_registers : Those are the registers used for communication between CPU AND PPU
+// There are also internal registers for the PPU
+// https://www.nesdev.org/wiki/PPU_scrolling#PPU_internal_registers
+// Also i want to thank javidx9 so much for explaing the PPU inner workings
+// https://www.youtube.com/watch?v=-THeUXqR3zY
 
 byte IRAM_ATTR ppu_read_from_cpu(byte addr)
 {
     byte data = 0x00;
     switch (addr)
     {
-    case 0:
-        break; // control not readable usually
-    case 1:
-        break; // mask not readable usually
-    case 2:
-        // TODO: CHECK THIS
+    case 0: // Control Register, Write Only
+        break;
+    case 1: // Mask Register, Write Only
+        break;
+    case 2:                                                           // Status Register, Read Only
         data = (status.reg & 0b11100000) | (PPU_BUFFER & 0b00011111); // last 5 bits of the last ppu bus transaction
-        // if (status.vertical_blank) {
-        //     Serial.printf("CPU reading $2002. Reg value: 0x%02X\n", status.reg);
-        // }
-        // i think clearing vblank is messing up with timing!
         clear_vblank();
         PPUADDR_latch = false;
         return data;
-    case 3:
-        // oam addr, write only
+    case 3: // OAM ADDR, Write Only
         break;
-    case 4:
+    case 4: // OAM DATA - returns sprite data
         return pOAM[OAMADDR];
         break;
-    case 5:
-        // scroll is not readable
+    case 5: // Scroll, Write only
         break;
-    case 6:
-        // ppu address is not readable
-        break;
-    case 7: // reads from memory but it is delayed one cycle
+    case 6:    // PPU addr, write only
+        break; // PPU Data, both read and write are allowed
+    case 7:
         data = PPU_BUFFER;
         PPU_BUFFER = ppu_read(vaddr.reg);
         if (vaddr.reg >= 0x3F00)
-            data = PPU_BUFFER;                          // separate memory on the ppu
+            data = PPU_BUFFER;
         vaddr.reg += (control.increment_mode ? 32 : 1); // either vertical or horizontal jumps in nametable
         return data;
         break;
@@ -206,26 +177,25 @@ byte IRAM_ATTR ppu_read_from_cpu(byte addr)
 
 void IRAM_ATTR ppu_write_from_cpu(byte addr, byte data)
 {
-    // Serial.println("PPU WRITE FROM CPU");
     switch (addr)
     {
-    case 0:
+    case 0: // Control register.
         control.reg = data;
         taddr.nametable_x = control.nametable_x;
         taddr.nametable_y = control.nametable_y;
         break;
-    case 1:
+    case 1: // MASK REGISTER
         mask.reg = data;
         break;
     case 2: // STATUS - read only
         break;
-    case 3:
+    case 3: // OAM ADDR - write only
         OAMADDR = data;
         return;
-    case 4:
+    case 4: // OAM DATA - WR
         pOAM[OAMADDR] = data;
-        return; // OAMDATA
-    case 5:     // Scroll Register
+        return;
+    case 5: // Scroll Register - Shares the same latch as PPU addr
         if (PPUADDR_latch == false)
         {
             fine_x = data & 0x07;
@@ -239,7 +209,7 @@ void IRAM_ATTR ppu_write_from_cpu(byte addr, byte data)
             PPUADDR_latch = false;
         }
         return;
-    case 6:
+    case 6: // PPU Addr - as the addr is 12 bits wide, we need to do two writes
         if (PPUADDR_latch == false)
         {
             taddr.reg = (uint16_t)((data & 0b00111111) << 8) | (taddr.reg & 0x00FF);
@@ -252,11 +222,14 @@ void IRAM_ATTR ppu_write_from_cpu(byte addr, byte data)
             PPUADDR_latch = false;
         }
         return;
-    case 7:
-        ppu_write(vaddr.reg, data); // PPUDATA
+    case 7: // PPUDATA, Read Write
+        ppu_write(vaddr.reg, data);
         vaddr.reg += (control.increment_mode ? 32 : 1);
     }
 }
+
+// Builds one scanline of background.
+// Read the explanations in ppu_helper if you want to understand the process
 
 loopy IRAM_ATTR build_background_scanline(int scanline_index, loopy vaddr_snapshot, byte fine_x_snapshot)
 {
@@ -293,8 +266,9 @@ loopy IRAM_ATTR build_background_scanline(int scanline_index, loopy vaddr_snapsh
 
             byte attr_coarse_x = tx >> 2;
             byte attr_coarse_y = coarse_y >> 2;
-            // TODO: maybe bitwise nt_y and tx with 1?
-            // ppu_read(0x23C0 | (vaddr.nametable_y << 11) | (vaddr.nametable_x << 10) | ((vaddr.coarse_y >> 2) << 3) | (vaddr.coarse_x >> 2));
+
+            // Attribute address math is kinda intimidating, the wiki explains it pretty well
+
             uint16_t attr_addr = 0x23C0 | (nt_y << 11) | (ntx << 10) | (attr_coarse_y << 3) | (attr_coarse_x);
             byte attr_byte = ppu_read(attr_addr);
 
@@ -315,22 +289,17 @@ loopy IRAM_ATTR build_background_scanline(int scanline_index, loopy vaddr_snapsh
     }
 
     loopy vaddr_next = vaddr_snapshot;
-
-    // this is what happpens after 32 increments
-    //  for (int i = 0; i < 32; ++i) {
-    //      if (vaddr_next.coarse_x == 31) {
-    //          vaddr_next.coarse_x = 0;
-    //          vaddr_next.nametable_x = !vaddr_next.nametable_x;
-    //      } else {
-    //          vaddr_next.coarse_x++;
-    //      }
-    //  }
-
     return vaddr_next;
 }
 
 uint32_t start_cycles;
 uint32_t end_cycles;
+
+byte sprite_pixel[256] = {0};
+byte sprite_palette[256] = {0};
+byte sprite_priority[256] = {0};
+bool sprite_zero_pixel[256] = {false};
+
 
 void IRAM_ATTR ppu_render_scanline()
 {
@@ -345,19 +314,31 @@ void IRAM_ATTR ppu_render_scanline()
     }
     else if (scanline >= 0 && scanline < 240)
     {
-        // Serial.printf("Scanline nr: %d\n", scanline);
-        //  ON real hardware this is done at dot 257 but we do it at the beginning
+        std::memset(sprite_pixel, 0, 256);
+        std::memset(sprite_palette, 0, 256);
+        std::memset(sprite_priority, 0, 256);
+        std::memset(sprite_zero_pixel, 0, 256);
+        // On real hardware this is done at dot 257 but we do it at the beginning, doesn't seem to be an issue
         transfer_address_x();
+
+        // BUILD BACKGROUND
         vaddr = build_background_scanline(scanline, vaddr, fine_x);
 
-        // start_cycles = xthal_get_ccount();
-        //  SPRITE EVALUATION
+        // SPRITE PROCESS
+
+        // Conceptually: The PPU goes through the Object Attribute Memory (OAM), which contain data for 64 sprites
+        // For each sprite, it calculates the difference between the current scnaline and sprite's y coordinate
+        // If the difference falls within the sprite's height, then we say this sprite is *active* for this scanline
+        // The limit for one line is 8 sprites. If more than 8 are found we need to set the status.sprite_overflow flag
+        // If the very first sprite in memory is found on the current like. we set sprite_zero_on_scanline (we use this for rendering effects)
+
+        // SPRITE EVALUATION -> finding sprites for the line that is to be rendered
         sprite_cnt = 0;
         sprite_zero_on_scanline = false;
-        std::memset(sprites_on_scanline, 0xFF, 8 * sizeof(_OAM));
+        // std::memset(sprites_on_scanline, 0xFF, 8 * sizeof(_OAM));
+        init_sprites_on_scanline(); // This function is basically the commented memset but loop unrolled.
         std::memset(sp_pattern_l, 0, 8);
         std::memset(sp_pattern_h, 0, 8);
-
         uint32_t i = 0;
         while (i < 64)
         {
@@ -382,7 +363,9 @@ void IRAM_ATTR ppu_render_scanline()
             i++;
         }
 
-        //===DATA FETCHING=== (get the sprites from memory based on what we done before)
+        // DATA FETCHING
+        // Once the 8 sprites are identified, the PPU fetches their specific tile data from the pattern tables(the same proccess as background)
+        // If vertical flip attribute bit is set, the ppu just reverses the row indexing
         for (int i = 0; i < sprite_cnt; i++)
         {
             uint16_t addr_l = 0;
@@ -396,10 +379,8 @@ void IRAM_ATTR ppu_render_scanline()
             {
                 addr_l = (control.pattern_sprite << 12) | (sprites_on_scanline[i].id << 4) | diff_y;
             }
-            else
+            else // 8x16 mode
             {
-                // maybe spliting these into multiple variables will make it easier for the
-                // compiler to optimize(fingers crossed!)
                 byte bank = sprites_on_scanline[i].id & 0x01;
                 byte tile = sprites_on_scanline[i].id & 0xFE;
                 if (diff_y >= 8)
@@ -411,27 +392,53 @@ void IRAM_ATTR ppu_render_scanline()
             }
             byte p_l = ppu_read(addr_l);
             byte p_h = ppu_read(addr_l + 8);
-            if (attr & 0x40)
+
+            if (attr & 0x40) // if horizontal flip
             {
                 p_l = flip_byte[p_l];
                 p_h = flip_byte[p_h];
             }
             sp_pattern_l[i] = p_l;
             sp_pattern_h[i] = p_h;
+
+            int sx = sprites_on_scanline[i].x;
+            byte pal = (sprites_on_scanline[i].attributes & 0x03) + 0x04;
+            byte prio = (sprites_on_scanline[i].attributes >> 5) & 1;
+
+            for (int px = 0; px < 8; px++)
+            {
+                int x = sx + px;
+                if (x < 0 || x >= 256)
+                    continue;
+
+                int bit = 7 - px;
+                byte pixel =
+                    (((sp_pattern_h[i] >> bit) & 1) << 1) |
+                    ((sp_pattern_l[i] >> bit) & 1);
+
+                if (pixel != 0 && sprite_pixel[x] == 0)
+                {
+                    sprite_pixel[x] = pixel;
+                    sprite_palette[x] = pal;
+                    sprite_priority[x] = prio;
+
+                    if (i == 0 && sprite_zero_on_scanline)
+                        sprite_zero_pixel[x] = true;
+                }
+            }
         }
 
+        // Pixel drawing. Here we draw all the pixels in a scanline, one by one.
+        // One big optimisation would be for this to be made in one go.
         for (int x = 0; x < 256; x++)
         {
             byte bg_pixel = 0x00;
             byte bg_pallete = 0x00;
-            if (mask.render_background)
+            if (mask.render_background && (mask.render_background_left || x >= 8))
             {
-                if (mask.render_background_left || x >= 8)
-                {
-                    byte combined = scanline_buffer[x];
-                    bg_pixel = combined & 0x03;
-                    bg_pallete = combined >> 2;
-                }
+                byte combined = scanline_buffer[x];
+                bg_pixel = combined & 0x03;
+                bg_pallete = combined >> 2;
             }
 
             // Foreground logic(sprites)
@@ -439,34 +446,12 @@ void IRAM_ATTR ppu_render_scanline()
             byte fg_pallete = 0;
             byte fg_priority = 0;
             bool sprite_zero_is_rendering = false;
-            if (mask.render_sprites)
+            if (mask.render_sprites && (mask.render_sprites_left || x >= 8))
             {
-                if (mask.render_sprites_left || x >= 8)
-                {
-                    for (int i = 0; i < sprite_cnt; i++)
-                    {
-                        int sx = sprites_on_scanline[i].x;
-                        if (x >= sx && x < sx + 8)
-                        {
-                            int diff_x = x - sx;
-
-                            int bit = 7 - diff_x;
-
-                            byte pixel_bit = ((sp_pattern_h[i] >> bit) & 1) << 1 | ((sp_pattern_l[i] >> bit) & 1);
-
-                            if (pixel_bit != 0)
-                            {
-                                fg_pixel = pixel_bit;
-                                fg_pallete = (sprites_on_scanline[i].attributes & 0x03) + 0x04;
-                                fg_priority = (sprites_on_scanline[i].attributes & 0x20) >> 5;
-
-                                if (i == 0 && sprite_zero_on_scanline)
-                                    sprite_zero_is_rendering = true;
-                                break;
-                            }
-                        }
-                    }
-                }
+                fg_pixel = sprite_pixel[x];
+                fg_pallete = sprite_palette[x];
+                fg_priority = sprite_priority[x];
+                sprite_zero_is_rendering = sprite_zero_pixel[x];
             }
 
             byte pixel = 0;
@@ -505,8 +490,7 @@ void IRAM_ATTR ppu_render_scanline()
             byte color = 0;
             if (pixel != 0)
             {
-                // Old way :
-                //color = ppu_read(0x3F00 + (pallete << 2) + pixel) & 0x3F;
+                // Old way : color = ppu_read(0x3F00 + (pallete << 2) + pixel) & 0x3F;
                 color = pallete_table[(pallete << 2) | pixel] & 0x3F;
             }
             else
@@ -514,8 +498,6 @@ void IRAM_ATTR ppu_render_scanline()
             screen_set_pixel(scanline, x, color);
         }
         increment_scroll_y();
-        // end_cycles = xthal_get_ccount();
-        // Serial.printf("Scanline rendering took %d cycles!", end_cycles - start_cycles);
     }
     else if (scanline == 240)
     {
@@ -538,220 +520,6 @@ void IRAM_ATTR ppu_render_scanline()
     }
     return;
 }
-/*
-void IRAM_ATTR ppu_execute()
-{
-    if (scanline == -1)
-    {
-        if (dots == 1)
-        {
-            clear_vblank();
-            status.sprite_overflow = 0;
-            status.sprite_zero_hit = 0;
-            std::memset(sp_pattern_h, 0, 8);
-            std::memset(sp_pattern_l, 0, 8);
-        }
-    }
-    if (scanline >= 0 && scanline < 240)
-    {
-        if (dots == 1)
-        {
-            transfer_address_x();
-            vaddr = build_background_scanline(scanline, vaddr, fine_x);
-        }
-
-        if (dots == 256)
-        {
-            // start_cycles = xthal_get_ccount();
-            //  SPRITE EVALUATION
-            sprite_cnt = 0;
-            sprite_zero_on_scanline = false;
-            std::memset(sprites_on_scanline, 0xFF, 8 * sizeof(_OAM));
-            std::memset(sp_pattern_l, 0, 8);
-            std::memset(sp_pattern_h, 0, 8);
-
-            uint32_t i = 0;
-            while (i < 64)
-            {
-                int16_t diff = scanline - (int16_t)OAM[i].y;
-                uint32_t sprite_height = control.sprite_size ? 16 : 8;
-
-                if (diff >= 0 && diff < (int)sprite_height)
-                {
-                    if (sprite_cnt < 8)
-                    {
-                        if (i == 0)
-                            sprite_zero_on_scanline = true;
-                        memcpy(&sprites_on_scanline[sprite_cnt], &OAM[i], sizeof(_OAM));
-                        sprite_cnt++;
-                    }
-                    else
-                    {
-                        status.sprite_overflow = 1;
-                        break;
-                    }
-                }
-                i++;
-            }
-
-            //===DATA FETCHING=== (get the sprites from memory based on what we done before)
-            for (int i = 0; i < sprite_cnt; i++)
-            {
-                uint16_t addr_l = 0;
-                byte attr = sprites_on_scanline[i].attributes;
-                int diff_y = scanline - sprites_on_scanline[i].y;
-
-                // this handles vertical flip
-                if (attr & 0x80)
-                    diff_y = (control.sprite_size ? 15 : 7) - diff_y;
-                if (!control.sprite_size) // 8x8 mode
-                {
-                    addr_l = (control.pattern_sprite << 12) | (sprites_on_scanline[i].id << 4) | diff_y;
-                }
-                else
-                {
-                    // maybe spliting these into multiple variables will make it easier for the
-                    // compiler to optimize(fingers crossed!)
-                    byte bank = sprites_on_scanline[i].id & 0x01;
-                    byte tile = sprites_on_scanline[i].id & 0xFE;
-                    if (diff_y >= 8)
-                    {
-                        diff_y -= 8;
-                        tile++;
-                    }
-                    addr_l = (bank << 12) | (tile << 4) | diff_y;
-                }
-                byte p_l = ppu_read(addr_l);
-                byte p_h = ppu_read(addr_l + 8);
-                if (attr & 0x40)
-                {
-                    p_l = flip_byte[p_l];
-                    p_h = flip_byte[p_h];
-                }
-                sp_pattern_l[i] = p_l;
-                sp_pattern_h[i] = p_h;
-            }
-
-            for (int x = 0; x < 256; x++)
-            {
-                byte bg_pixel = 0x00;
-                byte bg_pallete = 0x00;
-                if (mask.render_background)
-                {
-                    if (mask.render_background_left || x >= 8)
-                    {
-                        byte combined = scanline_buffer[x];
-                        bg_pixel = combined & 0x03;
-                        bg_pallete = combined >> 2;
-                    }
-                }
-
-                // Foreground logic(sprites)
-                byte fg_pixel = 0;
-                byte fg_pallete = 0;
-                byte fg_priority = 0;
-                bool sprite_zero_is_rendering = false;
-                if (mask.render_sprites)
-                {
-                    if (mask.render_sprites_left || x >= 8)
-                    {
-                        for (int i = 0; i < sprite_cnt; i++)
-                        {
-                            int sx = sprites_on_scanline[i].x;
-                            if ((uint32_t)(x - sx) < 8)
-                            {
-                                int diff_x = x - sx;
-
-                                int bit = 7 - diff_x;
-
-                                byte temp_mask = 0x80 >> diff_x;
-                                byte pixel_bit = ((sp_pattern_h[i] & temp_mask) ? 2 : 0) | ((sp_pattern_l[i] & temp_mask) ? 1 : 0);
-                                if (pixel_bit != 0)
-                                {
-                                    fg_pixel = pixel_bit;
-                                    fg_pallete = (sprites_on_scanline[i].attributes & 0x03) + 0x04;
-                                    fg_priority = (sprites_on_scanline[i].attributes & 0x20) >> 5;
-
-                                    if (i == 0 && sprite_zero_on_scanline)
-                                        sprite_zero_is_rendering = true;
-
-                                    // break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                byte pixel = 0;
-                byte pallete = 0;
-                if (fg_pixel == 0)
-                {
-                    pixel = bg_pixel;
-                    pallete = bg_pallete;
-                }
-                else if (bg_pixel == 0)
-                {
-                    pixel = fg_pixel;
-                    pallete = fg_pallete;
-                }
-                else
-                {
-                    if (fg_priority == 0)
-                    {
-                        pixel = fg_pixel;
-                        pallete = fg_pallete;
-                    }
-                    else
-                    {
-                        pixel = bg_pixel;
-                        pallete = bg_pallete;
-                    }
-                    if (!status.sprite_zero_hit && sprite_zero_on_scanline && sprite_zero_is_rendering)
-                    {
-                        if (mask.render_background && mask.render_sprites)
-                        {
-                            status.sprite_zero_hit = 1;
-                        }
-                    }
-                }
-
-                byte color = 0;
-                if (pixel != 0)
-                {
-                    color = ppu_read(0x3F00 + (pallete << 2) + pixel) & 0x3F;
-                    // color = pallete_table[(pallete << 2) + pixel] & 0x3F; // ppu_read(0x3F00 + (pallete << 2) + pixel) & 0x3F;
-                }
-                else
-                    color = transparent_pixel_color;
-                screen_set_pixel(scanline, x, color);
-            }
-            increment_scroll_y();
-            // end_cycles = xthal_get_ccount();
-            // Serial.printf("Scanline rendering took %d cycles!", end_cycles - start_cycles);
-        }
-    }
-    if (scanline == 241 && dots == 1)
-    {
-        set_vblank();
-        transparent_pixel_color = ppu_read(0x3F00) & 0x3F;
-        if (control.enable_nmi)
-        {
-            enqueue_nmi();
-        }
-    }
-
-    dots++;
-    if (dots > 340)
-    {
-        dots = 0;
-        scanline++;
-        if (scanline > 261)
-        {
-            scanline = -1;
-            RENDER_ENABLED = true;
-        }
-    }
-}*/
 
 // HELPER FUNCTIONS
 byte flip_byte_fn(byte x)
@@ -771,39 +539,6 @@ void generate_flip_byte_lt()
     {
         flip_byte[i] = flip_byte_fn(i);
     }
-}
-
-// No longer needed
-void inline IRAM_ATTR clock_shifters()
-{
-    // if (mask.render_background)
-    // {
-    //     bgs_pattern_l <<= 1;
-    //     bgs_pattern_h <<= 1;
-    //     bgs_attribute_h <<= 1;
-    //     bgs_attribute_l <<= 1;
-    // }
-    if (mask.render_sprites /*&& dots >= 1 && dots < 258*/)
-    {
-        for (int i = 0; i < sprite_cnt; i++)
-        {
-            if (sprites_on_scanline[i].x > 0)
-                sprites_on_scanline[i].x--;
-            else
-            {
-                sp_pattern_l[i] <<= 1;
-                sp_pattern_h[i] <<= 1;
-            }
-        }
-    }
-}
-
-inline void load_bg_shifters()
-{
-    bgs_pattern_l = (bgs_pattern_l & 0xFF00) | bg_next_tile_lsb;
-    bgs_pattern_h = (bgs_pattern_h & 0xFF00) | bg_next_tile_msb;
-    bgs_attribute_l = (bgs_attribute_l & 0xFF00) | ((bg_next_tile_attrib & 0b01) ? 0xFF : 0x00); // The lsbit of the attribute is mirrored 8 times
-    bgs_attribute_h = (bgs_attribute_h & 0xFF00) | ((bg_next_tile_attrib & 0b10) ? 0xFF : 0x00);
 }
 
 inline void transfer_address_x()
@@ -884,5 +619,6 @@ inline void init_sprites_on_scanline()
     pointer[5] = 0xFFFFFFFF;
     pointer[6] = 0xFFFFFFFF;
     pointer[7] = 0xFFFFFFFF;
+    // Not using memset because loop unrolling might be faster - Didn't profile this YET!
     // std::memset(sprites_on_scanline, 0xFF, 8 * sizeof(_OAM));
 }
