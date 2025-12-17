@@ -4,6 +4,7 @@
 
 /*
 This file only includes input handling for buttons - no need for analog stuff
+This is simulated SPI and that is not an issue as we have a lot of headroom on Core1
 */
 #include <Arduino.h>
 class PS2 {
@@ -23,4 +24,5 @@ class PS2 {
         byte shiftInOut(byte dataOut);
 };
 
+byte get_controller_input(PS2* gamepad);
 #endif

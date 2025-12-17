@@ -21,7 +21,7 @@ struct Instruction
     byte xx;
     byte y;
 };
-extern uint32_t cpu_debug_print;
+extern volatile bool cpu_debug_print;
 // CPU internal registers
 extern byte A;
 extern byte X;

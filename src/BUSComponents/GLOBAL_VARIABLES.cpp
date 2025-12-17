@@ -1,12 +1,58 @@
-#include "ppu.h"
+#include "cpu.h"
+#include "bus.h"
+#include "memory.h"
+typedef uint8_t byte;
+
+// =============BUS VARIABLES=================
+byte controller[2];
+byte controller_state[2];
+bool dma_transfer;
+bool dma_first_clock;
+byte oam_dma_page = 0x00;
+byte oam_dma_addr = 0x00;
+byte oam_dma_data = 0x00;
+uint32_t global_clock = 0;
+
+// ==============MEMORY VARIABLES=============
+byte DRAM_ATTR PRGrom[0x8000];
+byte DRAM_ATTR CHRrom[0x4000];
+byte DRAM_ATTR CPUram[0x0800];
+byte DRAM_ATTR PPUram[0x3FFF];
+
+
+// =============CPU VARIABLES=================
+struct Instruction inst;
+byte A = 0x00;
+byte X = 0x00;
+byte Y = 0x00;
+uint16_t PC = 0x0000;
+byte SP = 0xFD; 
+volatile bool cpu_debug_print = 0;
+uint32_t opcode = 0;
+
+
+uint32_t cycles = 0;
+int32_t estimated_cycles = 0;
+uint32_t elapsed_cycles = 0;
+
+byte C = 0; // carry
+byte Z = 0; // zero
+byte I = 1; // interrupt 
+byte D = 0; // decimal
+byte B = 0; // break
+byte O = 0; // overflow
+byte N = 0; // negative
+
+bool pending_nmi = false;
+bool pending_irq = false;
+
+// ==============PPU VARIABLES============
 
 PPUStatus DRAM_ATTR status;
-
 PPUmask DRAM_ATTR mask;
-
 PPUctrl DRAM_ATTR control;
-State pipeline_state;
 
+State pipeline_state;
 bool DRAM_ATTR pause_after_frame = false;
 uint16_t DRAM_ATTR current_frame = 0;
 bool DRAM_ATTR odd_frame = false;

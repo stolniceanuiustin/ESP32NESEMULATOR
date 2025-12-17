@@ -1,9 +1,10 @@
 #include "ppu.h"
 #include <Arduino.h>
 
-//Each 8x8 backgroud tile is encoded by 16 bytes
-//For each pixel - 2 bit color value that idnex from pallete
-//Normally, for CHRram, we should update this 
+// Each 8x8 backgroud tile is encoded by 16 bytes
+// For each pixel - 2 bit color value that idnex from pallete
+// Normally, for CHRram, we should update this, but since we focus on MAPPER0 for now we don't do that
+// Mapper0 doesn't have CHRram
 void build_tile_cache()
 {
     //there are 512 tiles kept in memory

@@ -464,10 +464,11 @@ void IRAM_ATTR cpu_clock()
         if (!pending_nmi)
         {
             opcode = read_pc();
-            if (cpu_debug_print)
-            {
-                Serial.printf("Opcode: %02X, PC: %04X | A:%02X X:%02X Y:%02X\n", opcode, PC, A, X, Y);
-            }
+            // Thankfully the CPU was thouroughly tested on x86 so we don't need this
+            // if (cpu_debug_print)
+            // {
+            //    Serial.printf("Opcode: %02X, PC: %04X | A:%02X X:%02X Y:%02X\n", opcode, PC, A, X, Y);
+            //}
             remaining_cycles += OPCODE_duration[opcode];
             opcode_table[opcode]();
         }

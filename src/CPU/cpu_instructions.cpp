@@ -10,10 +10,8 @@ inline void set_ZN(byte value)
     Z = (value == 0) ? 1 : 0;
     N = (value & 0x80) ? 1 : 0; // Checks bit 7 if it's set or not
 }
-/*
-ADDRESSED INSTRUCTIONS - THE HARDEST
-*/
 
+// ADDRESSED INSTRUCTIONS - THE HARDEST
 // GROUP 1 INSTRUCTIOS
 
 void IRAM_ATTR ORA(uint16_t address)

@@ -33,7 +33,7 @@ extern uint16_t nes_pallete_16[64];
 void generate_16bit_pallet(); // Convert 32-bit palette to 16-bit
 void screen_init();
 extern uint16_t pixels[256 * 240]; // NES resolution framebuffer
-extern bool RENDER_ENABLED;
+extern volatile bool RENDER_ENABLED;
 
 void inline screen_set_pixel(uint16_t scanline, uint16_t dot, uint8_t color_index)
 {

@@ -2,7 +2,7 @@
 
 uint16_t nes_pallete_16[64];
 uint16_t pixels[256 * 240]; // NES resolution framebuffer
-bool RENDER_ENABLED;
+volatile bool RENDER_ENABLED;
 
 void screen_init()
 {

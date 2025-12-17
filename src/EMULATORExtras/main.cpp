@@ -38,10 +38,9 @@ uint32_t end_cycles_d = 0;
 Config configClass = Config("/smb.bin");
 uint32_t frames = 0;
 void Core0Loop(void *parameter);
+void ps2Task(void *pvParameters);
 
-uint8_t div3 = 0;
-bool dma_phase = false;
-
+volatile bool profiling;
 /*
 It took 80 ESP Cycles/CPU Cycle on average, after changing the CPU core to be more efficient - and less readable. 
 It now takes 69-70 ESP cycles/CPU cycle but DMA is done separately and not meassured here. 
@@ -67,13 +66,12 @@ inline void bus_clock_t()
     ppu_render_scanline();
     // end_cycles_d = xthal_get_ccount();
     // scanline_avg += end_cycles_d - start_cycles_d;
+
+    // start_cycles_d = xthal_get_ccount();
     // // it should go from (0, 341/3) but since 341/3 = 113.66666, we round to 113. Rounding to 114 causes a small glitch on the
     // // scanline when sprite0 hit happens ()
-    // start_cycles_d = xthal_get_ccount();
     for (int i = 0; i < 113; i++)
-    {
         cpu_clock();
-    }
     
     // end_cycles_d = xthal_get_ccount();
     // uint32_t my_cycles = end_cycles_d - start_cycles_d;
@@ -120,7 +118,7 @@ void setup()
     uint32_t frames = 0;
 
     xTaskCreatePinnedToCore(Core0Loop, "Core0Loop", 10000, NULL, configMAX_PRIORITIES - 1, &Core0Task, 0);
-
+    xTaskCreatePinnedToCore(ps2Task, "PS2_Task", 4096, &gamepad, 1, NULL, 1);
 }
 
 uint32_t previous_time_s = 0;
@@ -135,51 +133,28 @@ void loop()
         frames = 0;
     }
     controller[0] = controller_input_buffer;
-    if (RENDER_ENABLED)
-    {
-        // for(int i=0; i<256*240; i++)
-        // {
-        //     pixels[i] = TFT_BLUE;
-        // }
+
+    if (RENDER_ENABLED){
         tft.pushImage(0, 0, 256, 240, pixels);
 
-        // input
-        gamepad.readController();
-
-        controller_input_buffer = 0;
-
-        if (gamepad.buttonIsPressed("UP"))
-            controller_input_buffer |= 0x08;
-
-        if (gamepad.buttonIsPressed("DOWN"))
-            controller_input_buffer |= 0x04;
-
-        if (gamepad.buttonIsPressed("LEFT"))
-            controller_input_buffer |= 0x02;
-
-        if (gamepad.buttonIsPressed("RIGHT"))
-            controller_input_buffer |= 0x01;
-
-        if (gamepad.buttonIsPressed("START")) // SDLK_s  = 0x10
-            controller_input_buffer |= 0x10;
-
-        if (gamepad.buttonIsPressed("SELECT")) // SDLK_a  = 0x20
-            controller_input_buffer |= 0x20;
-
-        if (gamepad.buttonIsPressed("SQUARE")) // SDLK_z  = 0x40
-            controller_input_buffer |= 0x40;
-
-        if (gamepad.buttonIsPressed("CROSS")) // SDLK_x  = 0x80
-            controller_input_buffer |= 0x80;
-
-        if(gamepad.buttonIsPressed("TRIANGLE"))
-            cpu_debug_print = !cpu_debug_print;
-
-        //=====IF CONTROLLER NOT WORKING ,UNCOMMENT THIS AND SEE INPUT_BUFFER IN REAL TIME!
-        // Serial.println(controller_input_buffer);
-        // Serial.println("Frame rendered");
+    controller_input_buffer = get_controller_input(&gamepad);
+        
+        // if(gamepad.buttonIsPressed("TRIANGLE"))
+        //     cpu_debug_print = !cpu_debug_print;
+        
+        if(gamepad.buttonIsPressed("CIRCLE")){
+            profiling = !profiling;
+        }
         frames++;
         RENDER_ENABLED = false;
+    }
+}
+
+void ps2Task(void *pvParameters){
+    PS2 *controller = (PS2 *)pvParameters;
+    for(;;){
+        controller->readController();
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -191,11 +166,12 @@ void IRAM_ATTR Core0Loop(void *parameter)
 
         for (int i = 0; i <= 500; i++)
         {
-            //            start_cycles_d = xthal_get_ccount();
+            start_cycles_d = xthal_get_ccount();
             bus_clock_t();
-            // end_cycles_d = xthal_get_ccount();
-            // uint32_t my_cycles = end_cycles_d - start_cycles_d;
-            // Serial.printf("On average %u ESP cycles/NES Scanline\n", my_cycles);
+            end_cycles_d = xthal_get_ccount();
+            uint32_t my_cycles = end_cycles_d - start_cycles_d;
+            if(profiling)
+                Serial.printf("On average %u ESP cycles/NES Scanline(CPU Included)\n", my_cycles);
         }
         
         // Serial.printf("On average %u ESP cycles/CPU Cycle\n", cpu_cycles_avg / cpu_cycles_cnt);
