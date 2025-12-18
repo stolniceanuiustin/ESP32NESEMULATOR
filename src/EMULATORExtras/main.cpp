@@ -144,7 +144,7 @@ void loop()
         // if(gamepad.buttonIsPressed("TRIANGLE"))
         //     cpu_debug_print = !cpu_debug_print;
 
-        if (gamepad.buttonIsPressed("CIRCLE"))
+        if (gamepad.buttonIsPressed(CIRCLE))
         {
             profiling = !profiling;
         }

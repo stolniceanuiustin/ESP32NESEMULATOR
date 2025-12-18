@@ -6,10 +6,10 @@ PS2::PS2(int datPin, int cmdPin, int attPin, int clkPin, int delayUS) : PS2_DAT(
 
 void PS2::begin()
 {
-    pinMode(PS2_DAT, INPUT_PULLUP); // Data with internal pull-up
-    pinMode(PS2_CMD, OUTPUT);
-    pinMode(PS2_ATT, OUTPUT);
-    pinMode(PS2_CLK, OUTPUT);
+    pinMode(PS2_DAT, INPUT_PULLUP); // MISO
+    pinMode(PS2_CMD, OUTPUT);       // MOSI
+    pinMode(PS2_ATT, OUTPUT);       // CS active on 0
+    pinMode(PS2_CLK, OUTPUT);       // SCLK
 
     digitalWrite(PS2_ATT, HIGH);
     digitalWrite(PS2_CMD, HIGH);
@@ -23,7 +23,8 @@ byte PS2::shiftInOut(byte dataOut)
     {
         digitalWrite(PS2_CMD, (dataOut & (1 << i)) ? HIGH : LOW);
         digitalWrite(PS2_CLK, LOW);
-        // TODO:VERY IMPORTANT. DO NOT LET THIS DELAY IN FINAL VERSION
+
+        // Yes, this delay is blocking, but since it runs on a separate thread it should not be an issue.
         delayMicroseconds(PS2_DELAY);
 
         if (digitalRead(PS2_DAT))
@@ -34,44 +35,49 @@ byte PS2::shiftInOut(byte dataOut)
     }
     return dataIn;
 }
-
-bool PS2::buttonIsPressed(String btn)
+bool PS2::buttonIsPressed(buttons_t btn)
 {
-
-    if (btn == "SELECT")
+    switch (btn)
+    {
+    // Low Byte buttons
+    case SELECT:
         return !(buttonsLow & 0x01);
-    if (btn == "L3")
+    case L3:
         return !(buttonsLow & 0x02);
-    if (btn == "R3")
+    case R3:
         return !(buttonsLow & 0x04);
-    if (btn == "START")
+    case START:
         return !(buttonsLow & 0x08);
-    if (btn == "UP")
+    case UP:
         return !(buttonsLow & 0x10);
-    if (btn == "RIGHT")
+    case RIGHT:
         return !(buttonsLow & 0x20);
-    if (btn == "DOWN")
+    case DOWN:
         return !(buttonsLow & 0x40);
-    if (btn == "LEFT")
+    case LEFT:
         return !(buttonsLow & 0x80);
-    if (btn == "L2")
+
+    // High Byte buttons
+    case L2:
         return !(buttonsHigh & 0x01);
-    if (btn == "R2")
+    case R2:
         return !(buttonsHigh & 0x02);
-    if (btn == "L1")
+    case L1:
         return !(buttonsHigh & 0x04);
-    if (btn == "R1")
+    case R1:
         return !(buttonsHigh & 0x08);
-    if (btn == "TRIANGLE")
+    case TRIANGLE:
         return !(buttonsHigh & 0x10);
-    if (btn == "CIRCLE")
+    case CIRCLE:
         return !(buttonsHigh & 0x20);
-    if (btn == "CROSS")
+    case CROSS:
         return !(buttonsHigh & 0x40);
-    if (btn == "SQUARE")
+    case SQUARE:
         return !(buttonsHigh & 0x80);
 
-    return false;
+    default:
+        return false;
+    }
 }
 
 void PS2::readController()
@@ -90,28 +96,28 @@ void PS2::readController()
 byte get_controller_input(PS2 *gamepad)
 {
     byte controller_input_buffer;
-    if (gamepad->buttonIsPressed("UP"))
+    if (gamepad->buttonIsPressed(UP))
         controller_input_buffer |= 0x08;
 
-    if (gamepad->buttonIsPressed("DOWN"))
+    if (gamepad->buttonIsPressed(DOWN))
         controller_input_buffer |= 0x04;
 
-    if (gamepad->buttonIsPressed("LEFT"))
+    if (gamepad->buttonIsPressed(LEFT))
         controller_input_buffer |= 0x02;
 
-    if (gamepad->buttonIsPressed("RIGHT"))
+    if (gamepad->buttonIsPressed(RIGHT))
         controller_input_buffer |= 0x01;
 
-    if (gamepad->buttonIsPressed("START"))
+    if (gamepad->buttonIsPressed(START))
         controller_input_buffer |= 0x10;
 
-    if (gamepad->buttonIsPressed("SELECT")) 
+    if (gamepad->buttonIsPressed(SELECT))
         controller_input_buffer |= 0x20;
 
-    if (gamepad->buttonIsPressed("SQUARE")) 
+    if (gamepad->buttonIsPressed(SQUARE))
         controller_input_buffer |= 0x40;
 
-    if (gamepad->buttonIsPressed("CROSS")) 
+    if (gamepad->buttonIsPressed(CROSS))
         controller_input_buffer |= 0x80;
 
     return controller_input_buffer;
