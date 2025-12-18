@@ -42,8 +42,8 @@ void ps2Task(void *pvParameters);
 
 volatile bool profiling;
 /*
-It took 80 ESP Cycles/CPU Cycle on average, after changing the CPU core to be more efficient - and less readable. 
-It now takes 69-70 ESP cycles/CPU cycle but DMA is done separately and not meassured here. 
+It took 80 ESP Cycles/CPU Cycle on average, after changing the CPU core to be more efficient - and less readable.
+It now takes 69-70 ESP cycles/CPU cycle but DMA is done separately and not meassured here.
 It seems that the CPU is no longer the bottleneck.
 
 
@@ -59,34 +59,35 @@ uint64_t cpu_cycles_avg = 0;
 uint32_t cpu_cycles_cnt = 0;
 uint32_t scanline_avg = 0;
 
-
+bool leap_cycle = false;
 inline void bus_clock_t()
 {
-//    start_cycles_d = xthal_get_ccount();
+    start_cycles_d = xthal_get_ccount();
     ppu_render_scanline();
-    // end_cycles_d = xthal_get_ccount();
-    // scanline_avg += end_cycles_d - start_cycles_d;
+    end_cycles_d = xthal_get_ccount();
+    scanline_avg += end_cycles_d - start_cycles_d;
 
-    // start_cycles_d = xthal_get_ccount();
-    // // it should go from (0, 341/3) but since 341/3 = 113.66666, we round to 113. Rounding to 114 causes a small glitch on the
-    // // scanline when sprite0 hit happens ()
-    for (int i = 0; i < 113; i++)
+    // It takes 341 PPU cycles to render a scanline. PPU runs three times faster than the CPU.
+    // it should go from (0, 341/3) but since 341/3 = 113.66666, we round to 113. Rounding to 114 causes a small glitch on the
+    // To fix this, we do a leap cycle every 226 cycles
+    // Kinda like the calendar does :)))
+    start_cycles_d = xthal_get_ccount();
+    for (int i = 0; i < 113 + leap_cycle; i++)
+    {
         cpu_clock();
-    
-    // end_cycles_d = xthal_get_ccount();
-    // uint32_t my_cycles = end_cycles_d - start_cycles_d;
-    // cpu_cycles_cnt += 113;
-    // cpu_cycles_avg += my_cycles;
-    // Serial.printf("On average %u ESP cycles/CPU Cycle\n", my_cycles/113);
+        leap_cycle != leap_cycle;
+    }
+    end_cycles_d = xthal_get_ccount();
+    uint32_t my_cycles = end_cycles_d - start_cycles_d;
+    cpu_cycles_cnt += 113;
+    cpu_cycles_avg += my_cycles;
 }
-
-
 
 void setup()
 {
     Serial.begin(115200);
     if (!LittleFS.begin(true))
-    { 
+    {
         Serial.println("Failed to mount LittleFS");
         while (1)
             ; // stop
@@ -114,7 +115,7 @@ void setup()
     cpu_init();
     cpu_reset();
     ppu_init();
-    
+
     uint32_t frames = 0;
 
     xTaskCreatePinnedToCore(Core0Loop, "Core0Loop", 10000, NULL, configMAX_PRIORITIES - 1, &Core0Task, 0);
@@ -134,15 +135,17 @@ void loop()
     }
     controller[0] = controller_input_buffer;
 
-    if (RENDER_ENABLED){
+    if (RENDER_ENABLED)
+    {
         tft.pushImage(0, 0, 256, 240, pixels);
 
-    controller_input_buffer = get_controller_input(&gamepad);
-        
+        controller_input_buffer = get_controller_input(&gamepad);
+
         // if(gamepad.buttonIsPressed("TRIANGLE"))
         //     cpu_debug_print = !cpu_debug_print;
-        
-        if(gamepad.buttonIsPressed("CIRCLE")){
+
+        if (gamepad.buttonIsPressed("CIRCLE"))
+        {
             profiling = !profiling;
         }
         frames++;
@@ -150,9 +153,11 @@ void loop()
     }
 }
 
-void ps2Task(void *pvParameters){
+void ps2Task(void *pvParameters)
+{
     PS2 *controller = (PS2 *)pvParameters;
-    for(;;){
+    for (;;)
+    {
         controller->readController();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -160,23 +165,22 @@ void ps2Task(void *pvParameters){
 
 void IRAM_ATTR Core0Loop(void *parameter)
 {
-    // esp_task_wdt_deinit(); // disable task WDT
+    // esp_task_wdt_deinit(); // disable task WDT -> This is supposed to
     for (;;)
     {
 
         for (int i = 0; i <= 500; i++)
         {
-            start_cycles_d = xthal_get_ccount();
             bus_clock_t();
-            end_cycles_d = xthal_get_ccount();
-            uint32_t my_cycles = end_cycles_d - start_cycles_d;
-            if(profiling)
-                Serial.printf("On average %u ESP cycles/NES Scanline(CPU Included)\n", my_cycles);
         }
-        
-        // Serial.printf("On average %u ESP cycles/CPU Cycle\n", cpu_cycles_avg / cpu_cycles_cnt);
-        // Serial.printf("On average %u ESP cycles/Scanline\n", scanline_avg / 500);
-        //scanline_avg = 0;
+
+        if (profiling)
+        {
+            Serial.printf("On average %u ESP cycles/CPU Cycle\n", cpu_cycles_avg / cpu_cycles_cnt);
+            Serial.printf("On average %u ESP cycles/Scanline\n", scanline_avg / 500);
+            scanline_avg = 0;
+        }
+       
         vTaskDelay(1); // keep the watchdog happy!
     }
 }

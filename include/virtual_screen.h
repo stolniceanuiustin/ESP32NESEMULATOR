@@ -37,9 +37,13 @@ extern volatile bool RENDER_ENABLED;
 
 void inline screen_set_pixel(uint16_t scanline, uint16_t dot, uint8_t color_index)
 {
+        // giving up on boundry checks so no time is wasted here!
+        // In a mission critical system you might want to keep this
+        
     // if (scanline >= 240 || dot >= 256 || color_index >= 64)
     //     return;
-    //giving up on boundry checks so no time is wasted here!
+
+    //256 * scanline + dot is a one cycle instrution - Indexed Store
     pixels[256 * scanline + dot] = nes_pallete_16[color_index];
 }
 

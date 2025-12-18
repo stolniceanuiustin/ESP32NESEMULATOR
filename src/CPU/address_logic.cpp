@@ -2,7 +2,8 @@
 
 // This contains all the address logic, as explained here:
 // https://www.nesdev.org/obelisk-6502-guide/addressing.html
-
+// https://eater.net/datasheets/w65c02s.pdf
+// 
 const byte last_byte = 0xFF; // 00...011111111
 uint16_t addr_IMM()
 {

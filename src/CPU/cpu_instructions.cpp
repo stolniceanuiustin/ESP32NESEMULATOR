@@ -4,7 +4,8 @@
 // full documentation of all instructions can be found here:
 // https://llx.com/Neil/a2/opcodes.html
 // https://www.nesdev.org/obelisk-6502-guide/
-//
+// https://www.righto.com/2012/12/the-6502-overflow-flag-explained.html
+// 
 inline void set_ZN(byte value)
 {
     Z = (value == 0) ? 1 : 0;
@@ -33,6 +34,9 @@ void IRAM_ATTR EOR(uint16_t address)
     A = A ^ read(address);
     set_ZN(A);
 }
+
+// The logic is explained here
+// https://stackoverflow.com/questions/29193303/6502-emulation-proper-way-to-implement-adc-and-sbc
 
 void IRAM_ATTR ADC(uint16_t address)
 {
@@ -66,6 +70,10 @@ void CMP(uint16_t address)
     C = !(result & 0xFF00) ? 1 : 0;
     set_ZN(result);
 }
+
+
+// https://stackoverflow.com/questions/29193303/6502-emulation-proper-way-to-implement-adc-and-sbc
+
 
 void SBC(uint16_t address)
 {
