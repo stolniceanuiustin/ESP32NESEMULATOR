@@ -2,12 +2,16 @@
 I developed a functional emulator for the Nintendo Entertainment System (NES), allowing original games (ROMs) to run on an ESP32s3.   
 This is a port of my original NESEmulator, which was designed for x86.  
 Currently, it runs Super Mario Bros at a "cinematic", but not real time yet, 24 FPS. 
-The CPU emulation is cycle stepped but not cycle accurate - i removed the checks for page crossings, as that took way too much CPU time, while the PPU renders everything on a scanline at once.  
+The CPU emulation is cycle stepped but not cycle accurate - i removed the checks for page crossings, as that took way too much CPU time, while the PPU renders everything on a scanline at once.    
+C is used for all the emulation of the system and C++ is used for less performance critical stuff.  
+The PS2 Controller "Driver" emulated SPI as i couldn't get the SPI library to work on my ESP32. In reality, the PS2 controller just communicates via type 3 SPI.
 
 ## Implemented MAPPERS:
 Unfortunetly, the only mapper implemented for now is MAPPER0, and it is hardcoded, as i tried to eliminate as much C++ overhead as possbile.  
 After i get this to run at full speed, i will implement other popular mappers.    
 So working games include, but are not limited to Super Mario Bros. 1 and Donkey Kong.  
+
+
 
 ## Prerequisites:
 *ESP-IDF or Arduino IDE (I am using PlatformIO IDE)  
