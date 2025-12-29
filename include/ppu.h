@@ -122,7 +122,7 @@ extern byte PPUSCROLL;
 extern byte nametable[2][0x0400]; // mirrored
 extern byte patterntable[2][0x1000];
 extern byte pallete_table[32];
-extern byte fine_x; // 3 bits wide! ONLY 3 BIT WIDE
+extern byte fine_x; // 3 bits wide! 
 
 // rendering shift registers! they shift every PPU clock. There are 2 16bit registers
 // https://www.nesdev.org/wiki/PPU_rendering

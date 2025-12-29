@@ -52,6 +52,11 @@ void ppu_init()
         nametable_ptrs[2] = nametable[1];
         nametable_ptrs[3] = nametable[1];
     }
+
+    memset(nametable[0], 0, 1024);
+    memset(nametable[1], 0, 1024);
+    memset(pallete_table, 0, 32);
+    tile_cache_initialized = false;
 }
 
 byte IRAM_ATTR ppu_read(uint16_t addr)

@@ -22,7 +22,7 @@ extern Config config;
 
 extern MIRROR mirroring;
 
-bool cartridge_read_file(char* rom_name);
+bool cartridge_read_file(const char* rom_name);
 const int PRG_BANK_SIZE = 16 * 1024;
 const int CHR_BANK_SIZE = 8 * 1024;
 

@@ -39,8 +39,38 @@ Config configClass = Config("/smb.bin");
 uint32_t frames = 0;
 void Core0Loop(void *parameter);
 void ps2Task(void *pvParameters);
-
+void draw_menu();
+void load_selected_game();
 volatile bool profiling;
+
+// MENU SYSTEM
+enum AppState
+{
+    STATE_MENU,
+    STATE_GAME,
+    STATE_LOADING
+};
+
+volatile AppState currentState = STATE_MENU;
+
+struct GameEntry
+{
+    const char *name;
+    const char *path;
+};
+
+const int GAME_COUNT = 5;
+GameEntry games[GAME_COUNT] = {
+    {"Pac-Man", "/Pacman.nes"},
+    {"Super Mario Bros", "/smb.bin"},
+    {"DonkeyKong", "/donkeykong.nes"},
+    {"Balloon_Fight", "/Balloon_fight.nes"},
+    {"Tetris", "/tetris_cnrom.nes"}};
+
+int selectedGameIdx = 0;
+bool menuRedrawNeeded = true;
+uint32_t lastInputTime = 0;
+
 /*
 It took 80 ESP Cycles/CPU Cycle on average, after changing the CPU core to be more efficient - and less readable.
 It now takes 69-70 ESP cycles/CPU cycle but DMA is done separately and not meassured here.
@@ -86,6 +116,7 @@ inline void bus_clock_t()
 void setup()
 {
     Serial.begin(115200);
+
     if (!LittleFS.begin(true))
     {
         Serial.println("Failed to mount LittleFS");
@@ -94,19 +125,16 @@ void setup()
     }
     Serial.println("LittleFS mounted successfully");
 
+    // WiFi and Bt cleanup for better FPS
     btStop();
     WiFi.mode(WIFI_OFF);
 
+    // Hardware Initialization
     gamepad.begin();
     delay(500);
     tft.init();
     tft.setRotation(0);
     tft.fillScreen(TFT_BLACK);
-
-    // Reads GAME from Cartridge and loads it into RAM
-    if (!cartridge_read_file("/smb.bin"))
-        exit(-1);
-
     Serial.println("READ FILE SUCCESFULLY\n");
 
     // This initializes the emulator (obviously!)
@@ -120,36 +148,71 @@ void setup()
 
     xTaskCreatePinnedToCore(Core0Loop, "Core0Loop", 10000, NULL, configMAX_PRIORITIES - 1, &Core0Task, 0);
     xTaskCreatePinnedToCore(ps2Task, "PS2_Task", 4096, &gamepad, 1, NULL, 1);
+
+    currentState = STATE_MENU;
+    menuRedrawNeeded = true;
 }
 
 uint32_t previous_time_s = 0;
 uint32_t current_time_s = 0;
+
 void loop()
 {
-    current_time_s = millis();
-    if (current_time_s - previous_time_s >= 1000)
+    if (currentState == STATE_MENU)
     {
-        previous_time_s = current_time_s;
-        Serial.println("FPS: " + String(frames));
-        frames = 0;
-    }
-    controller[0] = controller_input_buffer;
-
-    if (RENDER_ENABLED)
-    {
-        tft.pushImage(0, 0, 256, 240, pixels);
-
-        controller_input_buffer = get_controller_input(&gamepad);
-
-        // if(gamepad.buttonIsPressed("TRIANGLE"))
-        //     cpu_debug_print = !cpu_debug_print;
-
-        if (gamepad.buttonIsPressed(CIRCLE))
+        if (menuRedrawNeeded)
         {
-            profiling = !profiling;
+            draw_menu();
+            menuRedrawNeeded = false;
         }
-        frames++;
-        RENDER_ENABLED = false;
+
+        if (millis() - lastInputTime > 150)
+        {
+            if (gamepad.buttonIsPressed(DOWN))
+            {
+                selectedGameIdx = (selectedGameIdx + 1) % GAME_COUNT;
+                menuRedrawNeeded = true;
+                lastInputTime = millis();
+            }
+        }
+        if (gamepad.buttonIsPressed(CROSS))
+        {
+            load_selected_game();
+            lastInputTime = millis();
+        }
+    }
+    else if (currentState == STATE_GAME)
+    {
+        current_time_s = millis();
+        if (current_time_s - previous_time_s >= 1000)
+        {
+            previous_time_s = current_time_s;
+            Serial.println("FPS: " + String(frames));
+            frames = 0;
+        }
+        controller[0] = controller_input_buffer;
+
+        if (gamepad.buttonIsPressed(L2))
+        {
+            currentState = STATE_MENU;
+            tft.fillScreen(TFT_BLACK);
+            menuRedrawNeeded = true;
+            delay(500);
+            return;
+        }
+
+        if (RENDER_ENABLED)
+        {
+            tft.pushImage(0, 0, 256, 240, pixels);
+
+            controller_input_buffer = get_controller_input(&gamepad);
+            if (gamepad.buttonIsPressed(CIRCLE))
+            {
+                profiling = !profiling;
+            }
+            frames++;
+            RENDER_ENABLED = false;
+        }
     }
 }
 
@@ -162,25 +225,96 @@ void ps2Task(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
-
 void IRAM_ATTR Core0Loop(void *parameter)
 {
-    // esp_task_wdt_deinit(); // disable task WDT -> This is supposed to
     for (;;)
     {
-
-        for (int i = 0; i <= 500; i++)
+        // CRITICAL FIX: Only run the emulator if we are in STATE_GAME
+        if (currentState == STATE_GAME) 
         {
-            bus_clock_t();
-        }
+            for (int i = 0; i <= 500; i++)
+            {
+                bus_clock_t();
+            }
 
-        if (profiling)
+            if (profiling)
+            {
+                Serial.printf("Avg ESP cycles/CPU: %u\n", cpu_cycles_avg / cpu_cycles_cnt);
+                scanline_avg = 0;
+            }
+        } 
+        else 
         {
-            Serial.printf("On average %u ESP cycles/CPU Cycle\n", cpu_cycles_avg / cpu_cycles_cnt);
-            Serial.printf("On average %u ESP cycles/Scanline\n", scanline_avg / 500);
-            scanline_avg = 0;
+            // If in MENU or LOADING, do nothing and wait. 
+            // This prevents the CPU from reading memory while we are loading a file.
+            vTaskDelay(10); 
         }
        
-        vTaskDelay(1); // keep the watchdog happy!
+        vTaskDelay(1); // Keep the watchdog happy
+    }
+}
+void load_selected_game()
+{
+
+    currentState = STATE_LOADING;
+    memory_init();
+    
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(10, 110);
+    tft.setTextColor(TFT_WHITE);
+    tft.setTextSize(2);
+    tft.printf("Loading %s...", games[selectedGameIdx].name);
+
+    if (!cartridge_read_file(games[selectedGameIdx].path)) {
+        tft.setCursor(10, 140);
+        tft.setTextColor(TFT_RED);
+        tft.print("Load Failed!");
+        Serial.println("Failed to read file!");
+        delay(2000);
+        currentState = STATE_MENU;
+        menuRedrawNeeded = true;
+        return;
+    }
+
+    
+    screen_init();
+    bus_init();
+    cpu_init();
+    cpu_reset();
+    ppu_init();
+
+    Serial.println("Game loaded. Starting Emulation.");
+    tft.fillScreen(TFT_BLACK);
+    currentState = STATE_GAME;
+}
+
+void draw_menu() {
+    tft.fillScreen(TFT_BLUE); // Retro blue background
+    
+    tft.setTextSize(2);
+    tft.setTextColor(TFT_YELLOW, TFT_BLUE);
+    tft.setCursor(50, 20);
+    tft.print("NES EMULATOR");
+    
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_WHITE, TFT_BLUE);
+    tft.setCursor(20, 220);
+    tft.print("D-PAD: Move | X: Select | L2: Menu");
+
+    int startY = 80;
+    int gap = 30;
+
+    for (int i = 0; i < GAME_COUNT; i++) {
+        if (i == selectedGameIdx) {
+            tft.setTextColor(TFT_BLACK, TFT_WHITE); // Highlighted
+            tft.setTextSize(2);
+            tft.setCursor(20, startY + (i * gap));
+            tft.printf("> %s  ", games[i].name);
+        } else {
+            tft.setTextColor(TFT_WHITE, TFT_BLUE); // Normal
+            tft.setTextSize(2);
+            tft.setCursor(20, startY + (i * gap));
+            tft.printf("  %s  ", games[i].name);
+        }
     }
 }

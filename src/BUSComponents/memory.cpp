@@ -2,10 +2,8 @@
 
 // From my understanding, there macros should help the branch predictor.
 // But from my profiling it doesn't seem to be make any difference. From what i read this is dependant on the platform you run the code on.
-#define LIKELY(x)   (__builtin_expect(!!(x), 1))
+#define LIKELY(x) (__builtin_expect(!!(x), 1))
 #define UNLIKELY(x) (__builtin_expect(!!(x), 0))
-
-
 
 // This file has the implementation for ALL the memory related functions.
 
@@ -33,13 +31,13 @@ byte cpu_read(uint16_t addr)
     }
     else if (UNLIKELY(addr == 0x4016 || addr == 0x4017))
     {
-        // This is, in reality, a shift register. Every time the cpu reads this, it only gets one byte 
+        // This is, in reality, a shift register. Every time the cpu reads this, it only gets one byte
         // The cpu might read 8 times in a row, and you get the buttons in this order:
         // A, B, Select, Start, Up, Down, Left, Right
         // Fun Fact: they made it that way so the controller could only have 5 pins - VCC, GND, Latch, Clock and Data
         byte data = (controller_state[addr & 1] & 0x80) > 0 ? 1 : 0;
         controller_state[addr & 1] <<= 1;
-        return data; 
+        return data;
     }
     else
         return 0;
@@ -53,20 +51,20 @@ void cpu_write(uint16_t addr, byte data)
     }
     else if (addr >= 0x0000 && addr <= 0x1FFF)
     {
-        CPUram[addr& 0x07FF] = data;
+        CPUram[addr & 0x07FF] = data;
     }
-    else if (addr >= 0x2000 && addr <= 0x3FFF) 
+    else if (addr >= 0x2000 && addr <= 0x3FFF)
     {
-        ppu_write_from_cpu(addr & 0x0007, data);    
+        ppu_write_from_cpu(addr & 0x0007, data);
     }
     else if (addr >= 0x4000 && addr <= 0x4013)
     {
-        // Those are 
+        // Those are
     }
     else if (addr == 0x4014) // OAMDMA
     {
         // Writing in this register triggers a DMA between ram and the PPU object attribute memory
-        // A DMA here is really just a Blocking Burst Transfer, as 
+        // A DMA here is really just a Blocking Burst Transfer, as
         // This is no longer cycle accurate but we make that tradeoff for better performance
         // Worst case, we drift one cycle away.
 
@@ -85,4 +83,17 @@ void cpu_write(uint16_t addr, byte data)
         }
         prev_write = data;
     }
+}
+
+void memory_init()
+{
+    // extern byte PRGrom[0x8000];
+    // extern byte CHRrom[0x4000];
+    // extern byte CPUram[0x0800];
+    // extern byte PPUram[0x3FFF];
+    memset(PRGrom, 0, 0x8000);
+    memset(CHRrom, 0, 0x4000);
+    memset(CPUram, 0, 0x0800);
+    memset(PPUram, 0, 0x3FFF);
+    
 }

@@ -16,7 +16,7 @@ void set_mapping(uint16_t top_left, uint16_t top_right, uint16_t bottom_left, ui
     nametablee.map[3] = bottom_right;
 }
 
-bool cartridge_read_file(char* rom_name)
+bool cartridge_read_file(const char* rom_name)
 {
     Serial.printf("%s - ROM NAME\n", rom_name);
     File rom = LittleFS.open(rom_name, "r");
